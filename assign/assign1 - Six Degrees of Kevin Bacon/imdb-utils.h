@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 
-const std::string kIMDBDataDirectory("/usr/class/cs110/samples/assign1/");
+const std::string kIMDBDataDirectory("./slink/");
 
 /**
  * Convenience struct: film
