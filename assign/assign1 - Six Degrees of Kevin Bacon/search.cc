@@ -1,6 +1,6 @@
 #include <iostream>
 #include <list>
-#include <map>
+#include <unordered_map>
 #include <set>
 #include <vector>
 #include "imdb.h"
@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
 
     string source(argv[1]), dest(argv[2]);
     list<pair<string, short>> queue;
-    map<string, pair<film, string>> ancestor;
+    unordered_map<string, pair<film, string>> ancestor;
     set<string> seenActors;
     set<film> seenFilms;
 
