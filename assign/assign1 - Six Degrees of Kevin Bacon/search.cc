@@ -28,8 +28,7 @@ int main(int argc, char *argv[]) {
     set<string> seenActors;
     set<film> seenFilms;
 
-
-    queue.push_back(pair<string, short>(source, 0));
+    queue.push_back({source, 0});
     bool found = false;
 
     while (!queue.empty()) {
@@ -45,16 +44,16 @@ int main(int argc, char *argv[]) {
         vector<film> films;
         db.getCredits(front, films);
 
-        for (film f: films) {
+        for (film& f: films) {
             if (seenFilms.find(f) != seenFilms.end()) continue;
             seenFilms.insert(f);
             vector<string> cast;
             db.getCast(f, cast);
-            for (string p: cast) {
+            for (string& p: cast) {
                 if (seenActors.find(p) != seenActors.end()) continue;
                 seenActors.insert(p);
-                ancestor[p] = pair<film, string>(f, front);
-                queue.push_back(pair<string, short>(p, chainLength + 1));
+                ancestor[p] = {f, front};
+                queue.push_back({p, chainLength + 1});
                 if (p == dest) {
                     found = true;
                     break;
@@ -73,13 +72,15 @@ int main(int argc, char *argv[]) {
     list<pair<film, string>> path;
     string currentActor = dest;
     while (currentActor != source) {
-        path.push_front(pair<film, string>(ancestor[currentActor].first, currentActor));
+        path.push_front({ancestor[currentActor].first, currentActor});
         currentActor = ancestor[currentActor].second;
     }
 
     currentActor = source;
-    for (pair<film, string> p: path) {
-        cout << currentActor << " was in \"" << p.first.title << "\" (" << 1900 + p.first.year
+    for (pair<film, string>& p: path) {
+        cout << currentActor
+             << " was in \"" << p.first.title << "\" ("
+             << 1900 + p.first.year
              << ") with " << p.second << endl;
         currentActor = p.second;
     }
