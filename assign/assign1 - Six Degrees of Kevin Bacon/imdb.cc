@@ -25,7 +25,7 @@ imdb::~imdb() {
     releaseFileMap(movieInfo);
 }
 
-bool imdb::getCredits(const string& player, vector<film>& films) const { 
+bool imdb::getCredits(const string& player, vector<film>& films) const {
     const int numPlayers = *(int *) actorFile;
     int *firstOffset = (int *) actorFile + 1;
     int *lastOffset = (int *) actorFile + numPlayers;
