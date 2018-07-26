@@ -44,12 +44,12 @@ int main(int argc, char *argv[]) {
         vector<film> films;
         db.getCredits(front, films);
 
-        for (film& f: films) {
+        for (const film& f: films) {
             if (seenFilms.find(f) != seenFilms.end()) continue;
             seenFilms.insert(f);
             vector<string> cast;
             db.getCast(f, cast);
-            for (string& p: cast) {
+            for (const string& p: cast) {
                 if (seenActors.find(p) != seenActors.end()) continue;
                 seenActors.insert(p);
                 ancestor[p] = {f, front};
@@ -71,14 +71,14 @@ int main(int argc, char *argv[]) {
     }
 
     list<pair<film, string>> path;
-    string& currentActor = dest;
+    string currentActor = dest;
     while (currentActor != source) {
         path.push_front({ancestor[currentActor].first, currentActor});
         currentActor = ancestor[currentActor].second;
     }
 
     currentActor = source;
-    for (pair<film, string>& p: path) {
+    for (const pair<film, string>& p: path) {
         cout << currentActor
              << " was in \"" << p.first.title << "\" ("
              << 1900 + p.first.year
