@@ -22,12 +22,11 @@ int main(int argc, char *argv[]) {
         return kDatabaseNotFound;
     }
 
-    string source = string(argv[1]);
-    string dest = string(argv[2]);
-    list<pair<string, short>> queue = list<pair<string, short>>();
-    map<string, pair<film, string>> ancestor = map<string, pair<film, string>>();
-    set<string> seenActors = set<string>();
-    set<film> seenFilms = set<film>();
+    string source(argv[1]), dest(argv[2]);
+    list<pair<string, short>> queue;
+    map<string, pair<film, string>> ancestor;
+    set<string> seenActors;
+    set<film> seenFilms;
 
 
     queue.push_back(pair<string, short>(source, 0));
@@ -43,13 +42,13 @@ int main(int argc, char *argv[]) {
         queue.pop_front();
         seenActors.insert(front);
 
-        vector<film> films = vector<film>();
+        vector<film> films;
         db.getCredits(front, films);
 
         for (film f: films) {
             if (seenFilms.find(f) != seenFilms.end()) continue;
             seenFilms.insert(f);
-            vector<string> cast = vector<string>();
+            vector<string> cast;
             db.getCast(f, cast);
             for (string p: cast) {
                 if (seenActors.find(p) != seenActors.end()) continue;
@@ -71,8 +70,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-
-    list<pair<film, string>> path = list<pair<film, string>>();
+    list<pair<film, string>> path;
     string currentActor = dest;
     while (currentActor != source) {
         path.push_front(pair<film, string>(ancestor[currentActor].first, currentActor));
