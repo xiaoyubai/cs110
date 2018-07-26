@@ -33,8 +33,8 @@ int main(int argc, char *argv[]) {
 
     while (!queue.empty()) {
         pair<string, short> frontPair = queue.front();
-        string front = frontPair.first;
-        short chainLength = frontPair.second;
+        const string& front = frontPair.first;
+        const short chainLength = frontPair.second;
 
         if (chainLength >= 6) break;
 
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     }
 
     list<pair<film, string>> path;
-    string currentActor = dest;
+    string& currentActor = dest;
     while (currentActor != source) {
         path.push_front({ancestor[currentActor].first, currentActor});
         currentActor = ancestor[currentActor].second;
