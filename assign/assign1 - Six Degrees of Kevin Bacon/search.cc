@@ -65,7 +65,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (!found) {
-        cout << "No connection found between " << source << " and " << dest << endl;
+        cout << "No connection found between "
+             << source << " and " << dest << "." << endl;
         return 0;
     }
 
@@ -81,7 +82,8 @@ int main(int argc, char *argv[]) {
         cout << currentActor
              << " was in \"" << p.first.title << "\" ("
              << 1900 + p.first.year
-             << ") with " << p.second << endl;
+             << ") with " << p.second
+             << "." << endl;
         currentActor = p.second;
     }
 
