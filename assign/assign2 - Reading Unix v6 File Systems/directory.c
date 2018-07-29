@@ -15,7 +15,6 @@ int directory_findname(struct unixfilesystem *fs, const char *name,
     /* Not allocated or not a directory */
     return -1;
   }
-//  printf("Looking in directory for %s\n", name);
   int size = inode_getsize(&in);
   assert((size % sizeof(struct direntv6)) == 0);
   int numBlocks  = (size + DISKIMG_SECTOR_SIZE - 1) / DISKIMG_SECTOR_SIZE;
@@ -30,7 +29,6 @@ int directory_findname(struct unixfilesystem *fs, const char *name,
     }
     numEntriesInBlock = bytesLeft/sizeof(struct direntv6);
     for (i=0; i<numEntriesInBlock ; i++) {
-//      printf("Dirent name %s\n and inode_num %d\n", dir[i].d_name, dir[i].d_inumber);
       if (strcmp(name, dir[i].d_name) == 0) {
         *dirEnt = dir[i];
         return 0;

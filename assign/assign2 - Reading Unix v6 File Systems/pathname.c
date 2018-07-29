@@ -15,9 +15,7 @@ int pathname_lookup(struct unixfilesystem *fs, const char *pathname) {
   char pathname_cpy[strlen(pathname)+1];
   strcpy(pathname_cpy, pathname);
   char *tok = strtok(pathname_cpy + 1, PATH_SEP);
-//  printf("FIRST TOK: %s\n", tok);
   return pathname_lookup_helper(fs, ROOT_INUMBER, tok, &dirEnt);
-//  printf("DIRENT: %d %s\n", dirEnt.d_inumber, dirEnt.d_name);
 }
 
 int pathname_lookup_helper(struct unixfilesystem *fs, const int dirinumber,
@@ -26,7 +24,6 @@ int pathname_lookup_helper(struct unixfilesystem *fs, const int dirinumber,
     return -1;
   }
   tok = strtok(NULL, PATH_SEP);
-//  printf("NEXT TOK: %s\n", (tok != NULL) ? tok : "NULL");
   return (tok == NULL)
          ? dirEnt->d_inumber
          : pathname_lookup_helper(fs, dirEnt->d_inumber, tok, dirEnt);
