@@ -7,9 +7,9 @@
 
 #define INODE_SIZE 32  // size in bytes
 #define INODE_PER_BLOCK (DISKIMG_SECTOR_SIZE/INODE_SIZE)
-#define INODES_PER_INDIR 256
+#define BLOCKS_PER_INDIR 256
 #define NUM_INDIR_BLOCKS 7
-#define NUM_INDIR_INODES (INODES_PER_INDIR * NUM_INDIR_BLOCKS)
+#define TOTAL_BLOCKS_FROM_INDIR (BLOCKS_PER_INDIR * NUM_INDIR_BLOCKS)
 
 int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp) {
   int offset = (inumber-1) / INODE_PER_BLOCK;
@@ -28,23 +28,20 @@ int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp, int blockNum
     // not a large file
     return inp->i_addr[blockNum];
   }
-
-  if (blockNum < NUM_INDIR_INODES) {
+  uint16_t buf[BLOCKS_PER_INDIR];
+  if (blockNum < TOTAL_BLOCKS_FROM_INDIR) {
     // singly indirect
     // each block 256 * 2-byte block numbers
-    return inode_indexlookup_indirect(fs,inp, blockNum);
+    int indirBlockNum = blockNum / BLOCKS_PER_INDIR;
+    diskimg_readsector(fs->dfd, inp->i_addr[indirBlockNum], buf);
+    return buf[blockNum % BLOCKS_PER_INDIR];
   } else {
     // doubly indirect
-    blockNum = blockNum - NUM_INDIR_INODES;
-    return inode_indexlookup_indirect(fs,inp, blockNum);
+    int indirBlockNum = (blockNum - TOTAL_BLOCKS_FROM_INDIR) / BLOCKS_PER_INDIR;
+    diskimg_readsector(fs->dfd, inp->i_addr[7], buf);
+    diskimg_readsector(fs->dfd, buf[indirBlockNum], buf);
+    return buf[blockNum % BLOCKS_PER_INDIR];
   }
-}
-
-int inode_indexlookup_indirect(struct unixfilesystem *fs, struct inode *inp, int blockNum) {
-  int indirBlockNum = blockNum / INODES_PER_INDIR;
-  uint16_t buf[INODES_PER_INDIR];
-  diskimg_readsector(fs->dfd, indirBlockNum, buf);
-  return buf[blockNum % INODES_PER_INDIR];
 }
 
 int inode_getsize(struct inode *inp) {

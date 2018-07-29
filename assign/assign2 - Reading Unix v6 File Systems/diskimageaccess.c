@@ -131,6 +131,7 @@ static void DumpPathAndChildren(struct unixfilesystem *fs, const char *pathname,
     fprintf(stderr,"Can't read inode %d \n", inumber);
     return;
   }
+//  printf("DumpPathAndChildren: %s, %d\n", pathname, inumber);
   assert(in.i_mode & IALLOC);
 
   char chksum1[CHKSUMFILE_SIZE];
@@ -145,6 +146,7 @@ static void DumpPathAndChildren(struct unixfilesystem *fs, const char *pathname,
     return;
   }
 
+//  printf("PATHNAME %s INUMBER %d\n", pathname, inumber);
   if (!chksumfile_compare(chksum1, chksum2)) {
     fprintf(stderr,"Pathname checksum of %s differs from inode %d\n", pathname, inumber);
     return;
@@ -153,7 +155,7 @@ static void DumpPathAndChildren(struct unixfilesystem *fs, const char *pathname,
   char chksumstring[CHKSUMFILE_STRINGSIZE];
   chksumfile_cvt2string(chksum2, chksumstring);
   int size = inode_getsize(&in);
-  fprintf(f, "Path %s %d mode 0x%x size %d checksum %s\n",pathname,inumber,in.i_mode, size, chksumstring);
+  fprintf(f, "Path %s %d mode 0x%x size %d checksum %s\n", pathname, inumber, in.i_mode, size, chksumstring);
 
   if (pathname[1] == 0) {
     /* pathame == "/" */
@@ -168,6 +170,7 @@ static void DumpPathAndChildren(struct unixfilesystem *fs, const char *pathname,
 
       struct direntv6 direntries[10000];
       int numentries = GetDirEntries(fs, inumber, direntries, 10000);
+//    printf("numentries %d\n", numentries);
       for (int i = 0; i < numentries; i++) {
         char *n =  direntries[i].d_name;
         if (n[0] == '.') {
@@ -178,7 +181,8 @@ static void DumpPathAndChildren(struct unixfilesystem *fs, const char *pathname,
         }
 
         char nextpath[MAXPATH];
-        sprintf(nextpath, "%s/%s",pathname, direntries[i].d_name);
+        sprintf(nextpath, "%s/%s", pathname, direntries[i].d_name);
+//        printf("ENTRY: %s, %d\n", direntries[i].d_name, direntries[i].d_inumber);
         DumpPathAndChildren(fs, nextpath,  direntries[i].d_inumber, f);
       }
   }
@@ -231,6 +235,7 @@ static int GetDirEntries(struct unixfilesystem *fs, int inumber, struct direntv6
 
   if (maxNumEntries < 1) return -1;
   int size = inode_getsize(&in);
+//  printf("size %d\n", size);
 
   assert((size % sizeof(struct direntv6)) == 0);
 

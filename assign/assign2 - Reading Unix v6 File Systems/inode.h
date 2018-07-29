@@ -17,6 +17,8 @@ int inode_iget(struct unixfilesystem *fs, int inumber, struct inode *inp);
  */
 int inode_indexlookup(struct unixfilesystem *fs, struct inode *inp, int blockNum);
 
+int inode_indexlookup_indirect(struct unixfilesystem *fs, struct inode *inp, int blockNum);
+
 /**
  * Computes the size in bytes of the file identified by the given inode
  */
