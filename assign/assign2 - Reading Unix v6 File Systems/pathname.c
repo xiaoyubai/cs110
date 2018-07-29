@@ -7,8 +7,24 @@
 #include <string.h>
 #include <assert.h>
 
+#define PATH_SEP "/"
+
 int pathname_lookup(struct unixfilesystem *fs, const char *pathname) {
-  // remove the placeholder implementation and replace with your own
-  fprintf(stderr, "pathname_lookup(path=%s) unimplemented.  Returing -1.\n", pathname);
-  return -1;
+  if (strcmp(pathname, PATH_SEP) == 0) return ROOT_INUMBER;
+  struct direntv6 dirEnt;
+  char pathname_cpy[strlen(pathname)+1];
+  strcpy(pathname_cpy, pathname);
+  char *tok = strtok(pathname_cpy + 1, PATH_SEP);
+  return pathname_lookup_helper(fs, ROOT_INUMBER, tok, &dirEnt);
+}
+
+int pathname_lookup_helper(struct unixfilesystem *fs, const int dirinumber,
+                           char *tok, struct direntv6 *dirEnt) {
+  if (directory_findname(fs, tok, dirinumber, dirEnt) < 0) {
+    return -1;
+  }
+  tok = strtok(NULL, PATH_SEP);
+  return (tok == NULL)
+         ? dirEnt->d_inumber
+         : pathname_lookup_helper(fs, dirEnt->d_inumber, tok, dirEnt);
 }

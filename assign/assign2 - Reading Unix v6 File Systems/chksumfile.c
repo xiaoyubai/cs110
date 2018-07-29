@@ -46,7 +46,6 @@ int chksumfile_byinumber(struct unixfilesystem *fs, int inumber, void *chksum) {
 
   if (!SHA1_Final(chksum, &shactx))
     return -1;
-
   return SHA_DIGEST_LENGTH;
 }
 

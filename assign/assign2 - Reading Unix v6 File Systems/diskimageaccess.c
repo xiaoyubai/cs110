@@ -153,7 +153,7 @@ static void DumpPathAndChildren(struct unixfilesystem *fs, const char *pathname,
   char chksumstring[CHKSUMFILE_STRINGSIZE];
   chksumfile_cvt2string(chksum2, chksumstring);
   int size = inode_getsize(&in);
-  fprintf(f, "Path %s %d mode 0x%x size %d checksum %s\n",pathname,inumber,in.i_mode, size, chksumstring);
+  fprintf(f, "Path %s %d mode 0x%x size %d checksum %s\n", pathname, inumber, in.i_mode, size, chksumstring);
 
   if (pathname[1] == 0) {
     /* pathame == "/" */
@@ -178,7 +178,7 @@ static void DumpPathAndChildren(struct unixfilesystem *fs, const char *pathname,
         }
 
         char nextpath[MAXPATH];
-        sprintf(nextpath, "%s/%s",pathname, direntries[i].d_name);
+        sprintf(nextpath, "%s/%s", pathname, direntries[i].d_name);
         DumpPathAndChildren(fs, nextpath,  direntries[i].d_inumber, f);
       }
   }

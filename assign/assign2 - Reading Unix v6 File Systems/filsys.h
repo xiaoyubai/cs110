@@ -25,7 +25,7 @@ struct filsys {
   uint16_t	s_ninode;	// number of in core I nodes (0-100)
   uint16_t	s_inode[100];	// in core free I nodes
   uint8_t	s_flock;	// lock during free list manipulation
-  uint8_t       s_ilock;	// lock during I list manipulation
+  uint8_t   s_ilock;	// lock during I list manipulation
   uint8_t	s_fmod;		// super block modified flag
   uint8_t	s_ronly;	// mounted read-only flag
   uint16_t	s_time[2];	// current date of last update
