@@ -1,5 +1,5 @@
 #!/bin/sh
-# clear existing build related objects
+# clean existing build related objects
 for dir in `find ./assign/code -type d -d 1`
 do
     make clean -C ${dir}
