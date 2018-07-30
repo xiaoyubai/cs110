@@ -10,6 +10,6 @@ RUN apt-get update && apt-get install -y \
   vim
 
 # copy over git repo
-ADD . / /cs110/
+COPY . / /cs110/
 WORKDIR /cs110
 
