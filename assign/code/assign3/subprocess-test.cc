@@ -5,6 +5,7 @@
  */
 
 #include "subprocess.h"
+#include <assert.h>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -64,13 +65,49 @@ static void waitForChildProcess(pid_t pid) {
  * Serves as the entry point for for the unit test.
  */
 const string kSortExecutable = "/usr/bin/sort";
+char *argv[] = {const_cast<char *>(kSortExecutable.c_str()), NULL};
+
+static void supplyAndIngestTest() {
+  subprocess_t child = subprocess(argv, true, true);
+  assert(child.pid > 0);
+  assert(child.supplyfd > 0);
+  assert(child.ingestfd > 0);
+  publishWordsToChild(child.supplyfd);
+  ingestAndPublishWords(child.ingestfd);
+  waitForChildProcess(child.pid);
+}
+
+static void supplyAndNoIngestTest() {
+  subprocess_t child = subprocess(argv, true, false);
+  assert(child.pid > 0);
+  assert(child.supplyfd > 0);
+  assert(child.ingestfd == kNotInUse);
+  publishWordsToChild(child.supplyfd);
+  waitForChildProcess(child.pid);
+}
+
+static void noSupplyAndIngestTest() {
+  subprocess_t sp = subprocess(argv, false, true);
+  assert(sp.pid > 0);
+  assert(sp.ingestfd > 0);
+  assert(sp.supplyfd == kNotInUse);
+  waitForChildProcess(sp.pid);
+}
+
+static void noSupplyAndNoIngestTest() {
+  subprocess_t child = subprocess(argv, false, false);
+  assert(child.pid > 0);
+  assert(child.ingestfd == kNotInUse);
+  assert(child.supplyfd == kNotInUse);
+  waitForChildProcess(child.pid);
+}
+
 int main(int argc, char *argv[]) {
   try {
-    char *argv[] = {const_cast<char *>(kSortExecutable.c_str()), NULL};
-    subprocess_t child = subprocess(argv, true, true);
-    publishWordsToChild(child.supplyfd);
-    ingestAndPublishWords(child.ingestfd);
-    waitForChildProcess(child.pid);
+    supplyAndIngestTest();
+    supplyAndNoIngestTest();
+    noSupplyAndIngestTest();
+    noSupplyAndNoIngestTest();
     return 0;
   } catch (const SubprocessException& se) {
     cerr << "Problem encountered while spawning second process to run \"" << kSortExecutable << "\"." << endl;
