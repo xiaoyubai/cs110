@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y \
   make \
   vim
 
-# copy over git repo
-COPY . / /cs110/
+# create cs110 folder
+CMD mkdir /cs110
+
+# set cs110 as working dir
 WORKDIR /cs110
 
