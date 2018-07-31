@@ -22,11 +22,11 @@ using namespace std;
  */
 const string kWords[] = {"put", "a", "ring", "on", "it"};
 static void publishWordsToChild(int to) {
-	stdio_filebuf<char> outbuf(to, std::ios::out);
-	ostream os(&outbuf); // manufacture an ostream out of a write-oriented file descriptor so we can use C++ streams semantics (prettier!)
-	for (const string& word: kWords) os << word << endl;
+  stdio_filebuf<char> outbuf(to, std::ios::out);
+  ostream os(&outbuf); // manufacture an ostream out of a write-oriented file descriptor so we can use C++ streams semantics (prettier!)
+  for (const string& word: kWords) os << word << endl;
 } // stdio_filebuf destroyed, destructor calls close on desciptor it owns
-
+    
 /**
  * File: ingestAndPublishWords
  * ---------------------------
@@ -37,14 +37,14 @@ static void publishWordsToChild(int to) {
  * available to us.
  */
 static void ingestAndPublishWords(int from) {
-	stdio_filebuf<char> inbuf(from, std::ios::in);
-	istream is(&inbuf);
-	while (true) {
-		string word;
-		getline(is, word);
-		if (is.fail()) break;
-		cout << word << endl;
-	}
+  stdio_filebuf<char> inbuf(from, std::ios::in);
+  istream is(&inbuf);
+  while (true) {
+    string word;
+    getline(is, word);
+    if (is.fail()) break;
+    cout << word << endl;
+  }
 } // stdio_filebuf destroyed, destructor calls close on desciptor it owns
 
 /**
@@ -53,9 +53,9 @@ static void ingestAndPublishWords(int from) {
  * Halts execution until the process with the provided id exits.
  */
 static void waitForChildProcess(pid_t pid) {
-	if (waitpid(pid, NULL, 0) != pid) {
-		throw SubprocessException("Encountered a problem while waiting for subprocess's process to finish.");
-	}
+  if (waitpid(pid, NULL, 0) != pid) {
+    throw SubprocessException("Encountered a problem while waiting for subprocess's process to finish.");
+  }
 }
 
 /**
@@ -65,35 +65,19 @@ static void waitForChildProcess(pid_t pid) {
  */
 const string kSortExecutable = "/usr/bin/sort";
 int main(int argc, char *argv[]) {
-	// true, false
-	try {
-		char *argv[] = {const_cast<char *>(kSortExecutable.c_str()), NULL};
-		subprocess_t child = subprocess(argv, true, true);
-		publishWordsToChild(child.supplyfd);
-		ingestAndPublishWords(child.ingestfd);
-		waitForChildProcess(child.pid);
-		// true, false
-		child = subprocess(argv, true, false);
-		publishWordsToChild(child.supplyfd);
-		ingestAndPublishWords(child.ingestfd);
-		waitForChildProcess(child.pid);
-		// false, true
-		child = subprocess(argv, false, true);
-		publishWordsToChild(child.supplyfd);
-		ingestAndPublishWords(child.ingestfd);
-		waitForChildProcess(child.pid);
-		// false, false
-		child = subprocess(argv, false, false);
-		publishWordsToChild(child.supplyfd);
-		ingestAndPublishWords(child.ingestfd);
-		waitForChildProcess(child.pid);
-		return 0;
-	} catch (const SubprocessException& se) {
-		cerr << "Problem encountered while spawning second process to run \"" << kSortExecutable << "\"." << endl;
-		cerr << "More details here: " << se.what() << endl;
-		return 1;
-	} catch (...) { // ... here means catch everything else
-		cerr << "Unknown internal error." << endl;
-		return 2;
-	}
+  try {
+    char *argv[] = {const_cast<char *>(kSortExecutable.c_str()), NULL};
+    subprocess_t child = subprocess(argv, true, true);
+    publishWordsToChild(child.supplyfd);
+    ingestAndPublishWords(child.ingestfd);
+    waitForChildProcess(child.pid);
+    return 0;
+  } catch (const SubprocessException& se) {
+    cerr << "Problem encountered while spawning second process to run \"" << kSortExecutable << "\"." << endl;
+    cerr << "More details here: " << se.what() << endl;
+    return 1;
+  } catch (...) { // ... here means catch everything else
+    cerr << "Unknown internal error." << endl;
+    return 2;
+  }
 }
