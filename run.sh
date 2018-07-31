@@ -1,1 +1,1 @@
-docker run -v $(pwd)/assign/code/:/cs110/assign/code -it cs110 /bin/bash
+docker run -v $(pwd):/cs110 -it cs110 /bin/bash
