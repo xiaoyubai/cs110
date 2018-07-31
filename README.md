@@ -1,4 +1,21 @@
 # CS110
+
+My implementations of Stanford's CS110 assignments.
+
+## Instructions
+
+Build docker image:
+```
+sh build.sh
+```
+
+Run docker container:
+```
+sh run.sh
+```
+
+Forked from https://github.com/zhangrao1990/CS110
+
 ## Principles of Computer Systems
 
 Assignment I: Six Degrees
