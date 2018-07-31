@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 
 static void printArgumentVector(char *argv[]) {
   if (argv == NULL || *argv == NULL) {
@@ -47,7 +48,18 @@ static void simpleTest() {
   launchPipedExecutables(argv1, argv2);
 }
 
+static void sleepTest() {
+  char *argv1[] = {"sleep", "10", NULL};
+  char *argv2[] = {"sleep", "10", NULL};
+  struct timeval start, end;
+  gettimeofday(&start, NULL);
+  launchPipedExecutables(argv1, argv2);
+  gettimeofday(&end, NULL);
+  printf("Time elapsed: %ld seconds.\n", end.tv_sec - start.tv_sec);
+}
+
 int main(int argc, char *argv[]) {
   simpleTest();
+  sleepTest();
   return 0;
 }
