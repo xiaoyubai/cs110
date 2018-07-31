@@ -1,6 +1,6 @@
 # CS110
 
-My implementations of Stanford's CS110 assignments.
+My implementations for Stanford's CS110 assignments.
 
 ## Instructions
 
