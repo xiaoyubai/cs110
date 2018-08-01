@@ -91,7 +91,8 @@ static void noSupplyAndIngestTest() {
   assert(sp.pid > 0);
   assert(sp.ingestfd > 0);
   assert(sp.supplyfd == kNotInUse);
-  waitForChildProcess(sp.pid);
+  // TODO: This creates a zombie process
+//  waitForChildProcess(sp.pid);
 }
 
 static void noSupplyAndNoIngestTest() {
@@ -99,7 +100,8 @@ static void noSupplyAndNoIngestTest() {
   assert(child.pid > 0);
   assert(child.ingestfd == kNotInUse);
   assert(child.supplyfd == kNotInUse);
-  waitForChildProcess(child.pid);
+  // TODO: This creates a zombie process
+//  waitForChildProcess(child.pid);
 }
 
 int main(int argc, char *argv[]) {
