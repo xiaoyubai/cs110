@@ -93,7 +93,7 @@ static void noSupplyAndIngestTest() {
   assert(sp.ingestfd > 0);
   assert(sp.supplyfd == kNotInUse);
   kill(sp.pid, SIGTERM);
-//  waitForChildProcess(sp.pid);
+  waitForChildProcess(sp.pid);
 }
 
 static void noSupplyAndNoIngestTest() {
@@ -102,7 +102,22 @@ static void noSupplyAndNoIngestTest() {
   assert(child.ingestfd == kNotInUse);
   assert(child.supplyfd == kNotInUse);
   kill(child.pid, SIGTERM);
-//  waitForChildProcess(child.pid);
+  waitForChildProcess(child.pid);
+}
+
+void handler(int sig) {
+  kill(waitpid(sig, NULL, 0), SIGCONT);
+}
+
+static void supplyFdCloseTest() {
+  // Use a sig handler because the subprocess usually halts too late
+  signal(SIGCHLD, handler);
+  const string exec = "./factor.py";
+  char* argv[] = {const_cast<char *>(exec.c_str()), "--self-halting", NULL};
+  subprocess_t child = subprocess(argv, true, false);
+  cout << "kill sent" << endl;
+  assert(close(child.supplyfd) == 0);
+  waitForChildProcess(child.pid);
 }
 
 int main(int argc, char *argv[]) {
@@ -111,6 +126,7 @@ int main(int argc, char *argv[]) {
     supplyAndNoIngestTest();
     noSupplyAndIngestTest();
     noSupplyAndNoIngestTest();
+    supplyFdCloseTest();
     return 0;
   } catch (const SubprocessException& se) {
     cerr << "Problem encountered while spawning second process to run \"" << kSortExecutable << "\"." << endl;

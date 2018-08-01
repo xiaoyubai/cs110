@@ -28,12 +28,21 @@ def factorization(num):
 
 self_halting = len(sys.argv) > 1 and sys.argv[1] == '--self-halting'
 pid = os.getpid()
+print 'running on pid %d' %pid
 while True:
-    if self_halting: os.kill(pid, signal.SIGSTOP)
-    try: num = int(raw_input()) 
-    except EOFError: break;
+    if self_halting:
+        print 'halt!'
+        os.kill(pid, signal.SIGSTOP)
+        print 'cont!'
+    try:
+        print 'getting input ...'
+        num = int(raw_input())
+    except EOFError:
+        print 'EOF!'
+        break;
     start = time.time()
     response = factorization(num)
     stop = time.time()
     print '%s [pid: %d, time: %g seconds]' % (response, pid, stop - start)
+print 'terminating pid %d' % pid
     

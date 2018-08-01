@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <vector>
+#include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <unordered_map>
@@ -30,14 +31,16 @@ static void markWorkersAsAvailable(int sig) {
     pid_t pid = waitpid(-1, NULL, WUNTRACED | WNOHANG);
     if (pid <= 0) break;
     workers[pids[pid]].available = true;
+    cout << "numWorkersAvailable++" << endl;
     numWorkersAvailable++;
+    printf("avail! new value = %d\n", numWorkersAvailable);
   }
 }
 
-static inline sigset_t get_mask() {
+static inline sigset_t getMask() {
   sigset_t mask;
-  sigemptyset(&mask);
-  sigaddset(&mask, SIGCHLD);
+  sigfillset(&mask);
+  sigdelset(&mask, SIGCHLD);
   return mask;
 }
 
@@ -56,41 +59,56 @@ static void spawnAllWorkers() {
 }
 
 static size_t getAvailableWorker() {
-  sigset_t mask = get_mask();
-  if (!numWorkersAvailable) sigsuspend(&mask);
+  sigset_t mask = getMask();
+  cout << "current numWorkersAvailable " << numWorkersAvailable << endl;
+  if (!numWorkersAvailable) {
+    sigsuspend(&mask);
+    cout << "woke up from sigsupend!" << endl;
+  }
   for (size_t i=0; i<workers.size(); i++) {
     if (workers[i].available) return i;
   }
+  return -1;
 }
 
 static void broadcastNumbersToWorkers() {
   while (true) {
     string line;
     getline(cin, line);
+    cout << "waiting for more lines" << endl;
     if (cin.fail()) break;
     size_t endpos;
     long long num = stoll(line, &endpos);
     if (endpos != line.size()) break;
+    cout << "waiting for workers" << endl;
     struct worker& wk = workers[getAvailableWorker()];
+    cout << "numWorkersAvailable-- from " << numWorkersAvailable <<  endl;
     numWorkersAvailable--;
-    assert(wk.available);
+//    assert(wk.available);
+    wk.available = false;
     kill(wk.sp.pid, SIGCONT);
-    cout << "read line: " << line << endl;
     string lined = line + "\n";
     write(wk.sp.supplyfd, lined.c_str(), lined.size());
   }
 }
 
 static void waitForAllWorkers() {
-  sigset_t mask = get_mask();
-  while (numWorkersAvailable < workers.size())
+  sigset_t mask = getMask();
+  while (numWorkersAvailable < kNumCPUs)
     sigsuspend(&mask);
+  cout << "going to close next, numWorkersAvailable:" <<  numWorkersAvailable << endl;
 }
 
 static void closeAllWorkers() {
   signal(SIGCHLD, SIG_DFL);
   for (worker& w: workers) {
-    close(w.sp.supplyfd);
+    cout << "sup" << endl;
+    kill(w.sp.pid, SIGCONT);
+    assert(close(w.sp.supplyfd) == 0);
+  }
+
+  for (worker& w: workers) {
+    cout << "waiting on pid: " << w.sp.pid << endl;
     waitpid(w.sp.pid, NULL, 0);
   }
 }

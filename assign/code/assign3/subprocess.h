@@ -79,7 +79,7 @@ struct subprocess_t {
   int supplyfd;
   int ingestfd;
 };
- 
+
 /**
  * Function: subprocess
  * --------------------
