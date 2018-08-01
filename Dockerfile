@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
   g++-5 \
   git \
   make \
+  man \
   python \
   vim
 

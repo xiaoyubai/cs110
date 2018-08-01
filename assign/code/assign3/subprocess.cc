@@ -106,19 +106,20 @@ subprocess_t subprocess(char *argv[], bool supplyChildInput, bool ingestChildOut
     (ingestChildOutput) ? ingestFd[0] : kNotInUse
   };
 
-  if (sp.pid == 0) {
-    // in child subprocess
-    sp_close(supplyFd[1]);
-    sp_close(ingestFd[0]);
-
-    if (supplyChildInput) sp_dup2(supplyFd[0], STDIN_FILENO);
-    if (ingestChildOutput) sp_dup2(ingestFd[1], STDOUT_FILENO);
-    sp_execvp(argv[0], argv);
+  if (sp.pid > 0) {
+    // in parent
+    sp_close(supplyFd[0]);
+    sp_close(ingestFd[1]);
+    return sp;
   }
 
-  // in parent
+  // in child subprocess
+  sp_close(supplyFd[1]);
+  sp_close(ingestFd[0]);
+
+  if (supplyChildInput) sp_dup2(supplyFd[0], STDIN_FILENO);
+  if (ingestChildOutput) sp_dup2(ingestFd[1], STDOUT_FILENO);
   sp_close(supplyFd[0]);
   sp_close(ingestFd[1]);
-
-  return sp;
+  sp_execvp(argv[0], argv);
 }

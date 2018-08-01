@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <iostream>
 #include <fstream>
+#include <signal.h>
 #include <string>
 #include <sys/wait.h>
 #include <ext/stdio_filebuf.h>
@@ -91,7 +92,7 @@ static void noSupplyAndIngestTest() {
   assert(sp.pid > 0);
   assert(sp.ingestfd > 0);
   assert(sp.supplyfd == kNotInUse);
-  // TODO: This creates a zombie process
+  kill(sp.pid, SIGTERM);
 //  waitForChildProcess(sp.pid);
 }
 
@@ -100,7 +101,7 @@ static void noSupplyAndNoIngestTest() {
   assert(child.pid > 0);
   assert(child.ingestfd == kNotInUse);
   assert(child.supplyfd == kNotInUse);
-  // TODO: This creates a zombie process
+  kill(child.pid, SIGTERM);
 //  waitForChildProcess(child.pid);
 }
 
