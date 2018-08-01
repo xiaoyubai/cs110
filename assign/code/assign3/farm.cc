@@ -31,24 +31,15 @@ static void markWorkersAsAvailable(int sig) {
     pid_t pid = waitpid(-1, NULL, WUNTRACED | WNOHANG);
     if (pid <= 0) break;
     workers[pids[pid]].available = true;
-    cout << "numWorkersAvailable++" << endl;
     numWorkersAvailable++;
-    printf("avail! new value = %d\n", numWorkersAvailable);
   }
 }
 
-static inline sigset_t getMask() {
-  sigset_t mask;
-  sigfillset(&mask);
-  sigdelset(&mask, SIGCHLD);
-  return mask;
-}
-
-static /* const */ char *kWorkerArguments[] = {"./factor.py", "--self-halting", NULL};
+static const char *kWorkerArguments[] = {"./factor.py", "--self-halting", NULL};
 static void spawnAllWorkers() {
   cout << "There are this many CPUs: " << kNumCPUs << ", numbered 0 through " << kNumCPUs - 1 << "." << endl;
   for (size_t i = 0; i < kNumCPUs; i++) {
-    workers[i] = worker(kWorkerArguments);
+    workers[i] = worker((char **) kWorkerArguments);
     pids[workers[i].sp.pid]= i;
     cpu_set_t set;
     CPU_ZERO(&set);
@@ -59,12 +50,13 @@ static void spawnAllWorkers() {
 }
 
 static size_t getAvailableWorker() {
-  sigset_t mask = getMask();
-  cout << "current numWorkersAvailable " << numWorkersAvailable << endl;
-  if (!numWorkersAvailable) {
-    sigsuspend(&mask);
-    cout << "woke up from sigsupend!" << endl;
-  }
+  sigset_t oldMask, extraMask;
+  sigemptyset(&extraMask);
+  sigaddset(&extraMask, SIGCHLD);
+  sigprocmask(SIG_BLOCK, &extraMask, &oldMask);
+  while (!numWorkersAvailable)
+    sigsuspend(&oldMask);
+  sigprocmask(SIG_UNBLOCK, &extraMask, NULL);
   for (size_t i=0; i<workers.size(); i++) {
     if (workers[i].available) return i;
   }
@@ -75,40 +67,37 @@ static void broadcastNumbersToWorkers() {
   while (true) {
     string line;
     getline(cin, line);
-    cout << "waiting for more lines" << endl;
     if (cin.fail()) break;
     size_t endpos;
     long long num = stoll(line, &endpos);
     if (endpos != line.size()) break;
-    cout << "waiting for workers" << endl;
     struct worker& wk = workers[getAvailableWorker()];
-    cout << "numWorkersAvailable-- from " << numWorkersAvailable <<  endl;
     numWorkersAvailable--;
-//    assert(wk.available);
+    assert(wk.available);
     wk.available = false;
     kill(wk.sp.pid, SIGCONT);
-    string lined = line + "\n";
-    write(wk.sp.supplyfd, lined.c_str(), lined.size());
+    dprintf(wk.sp.supplyfd, "%lld\n", num);
   }
 }
 
 static void waitForAllWorkers() {
-  sigset_t mask = getMask();
+  sigset_t oldMask, extraMask;
+  sigemptyset(&extraMask);
+  sigaddset(&extraMask, SIGCHLD);
+  sigprocmask(SIG_BLOCK, &extraMask, &oldMask);
   while (numWorkersAvailable < kNumCPUs)
-    sigsuspend(&mask);
-  cout << "going to close next, numWorkersAvailable:" <<  numWorkersAvailable << endl;
+    sigsuspend(&oldMask);
+  sigprocmask(SIG_UNBLOCK, &extraMask, NULL);
 }
 
 static void closeAllWorkers() {
   signal(SIGCHLD, SIG_DFL);
   for (worker& w: workers) {
-    cout << "sup" << endl;
     kill(w.sp.pid, SIGCONT);
     assert(close(w.sp.supplyfd) == 0);
   }
 
   for (worker& w: workers) {
-    cout << "waiting on pid: " << w.sp.pid << endl;
     waitpid(w.sp.pid, NULL, 0);
   }
 }
