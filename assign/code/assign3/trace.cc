@@ -69,77 +69,72 @@ int main(int argc, char *argv[]) {
         break;
       } else if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP2) {
         int sysCallNum = ptrace(PTRACE_PEEKUSER, pid, ORIG_RAX * sizeof(long));
+        const string sysCallName = systemCallNumbers[sysCallNum];
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
         waitpid(pid, &status, 0);
-        if (WIFEXITED(status)) {
-          cout << "syscall(" << sysCallNum << ") = <no return>" << endl;
-          break;
-        }
 
-        // NEW
-        const string sysCallName = systemCallNumbers[sysCallNum];
-        const systemCallSignature sysCallSig = systemCallSignatures[sysCallName];
-        vector<string> stringArgs;
-        for (size_t i=0; i<sysCallSig.size(); i++) {
-          long regVal = ptrace(PTRACE_PEEKUSER, pid, argRegisters[i] * sizeof(long));
-          switch (sysCallSig[i]) {
-            case SYSCALL_INTEGER:
-              stringArgs.push_back(to_string((int) regVal));
-              break;
-            case SYSCALL_STRING: {
-              if ((void *) regVal == NULL) {
-                stringArgs.push_back("NULL");
+        if (!simple) {
+          const systemCallSignature sysCallSig = systemCallSignatures[sysCallName];
+          vector<string> stringArgs;
+          for (size_t i=0; i<sysCallSig.size(); i++) {
+            long regVal = ptrace(PTRACE_PEEKUSER, pid, argRegisters[i] * sizeof(long));
+            switch (sysCallSig[i]) {
+              case SYSCALL_INTEGER:
+                stringArgs.push_back(to_string((int) regVal));
+                break;
+              case SYSCALL_STRING: {
+                if ((void *) regVal == NULL) {
+                  stringArgs.push_back("NULL");
+                  break;
+                }
+                // regVal points to a null terminated string
+                string res = "\"";
+                while (true) {
+                  bool done = false;
+                  long regStr = ptrace(PTRACE_PEEKDATA, pid, regVal);
+                  for (size_t i=0; i<sizeof(long); i++) {
+                    char ch = ((char *) &regStr)[i];
+                    res += ch;
+                    if (ch == '\0') {
+                      done = true;
+                      break;
+                    }
+                  }
+                  regVal += sizeof(long);
+                  if (done) break;
+                }
+                res += "\"";
+                stringArgs.push_back(res);
                 break;
               }
-              // regVal points to a null terminated string
-              string res = "\"";
-              while (true) {
-                bool done = false;
-                long regStr = ptrace(PTRACE_PEEKDATA, pid, regVal);
-                for (size_t i=0; i<sizeof(long); i++) {
-                  char ch = ((char *) &regStr)[i];
-                  res += ch;
-                  if (ch == '\0') {
-                    done = true;
-                    break;
-                  }
-                }
-                regVal += sizeof(long);
-                if (done) break;
+              case SYSCALL_POINTER: {
+                stringstream ss;
+                if ((void *) regVal != NULL)
+                  ss << (void *) regVal;
+                else
+                  ss << "NULL";
+                stringArgs.push_back(ss.str());
+                break;
               }
-              res += "\"";
-              stringArgs.push_back(res);
-              break;
+              case SYSCALL_UNKNOWN_TYPE:
+                fprintf(stderr, "Syscall with unknown param type\n");
+                return 2;
             }
-            case SYSCALL_POINTER: {
-              stringstream ss;
-              if ((void *) regVal != NULL)
-                ss << (void *) regVal;
-              else
-                ss << "NULL";
-              stringArgs.push_back(ss.str());
-              break;
-            }
-            case SYSCALL_UNKNOWN_TYPE:
-              fprintf(stderr, "Syscall with unknown param type\n");
-              return 2;
           }
+          cout << sysCallName << "(" << join(stringArgs, ", ") << ") = ";
+        } else {
+          cout << "syscall(" << sysCallNum << ") = ";
+          ptrace(PTRACE_SYSCALL, pid, 0, 0);
         }
-        long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
-        cout << sysCallName
-            << "("
-            << join(stringArgs, ", ")
-            << ") = "
-            << retval
-            << endl;
-        ptrace(PTRACE_SYSCALL, pid, 0, 0);
-        // NEW
 
-        // OLD
-//        long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
-//        cout << "syscall(" << sysCallNum << ") = " << retval << endl;
-//        ptrace(PTRACE_SYSCALL, pid, 0, 0);
-        // OLD
+        if (WIFEXITED(status)) {
+          cout << "<no return>" << endl;
+          break;
+        } else {
+          long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
+          cout << retval << endl;
+        }
+        ptrace(PTRACE_SYSCALL, pid, 0, 0);
       } else {
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
       }
