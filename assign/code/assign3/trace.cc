@@ -33,6 +33,7 @@ using namespace std;
 typedef int regtype;
 
 static const regtype argRegisters[] = {RDI, RSI, RDX, R10, R8, R9};
+static const set<string> voidStarReturns = {"brk", "sbrk", "mmap"};
 
 int main(int argc, char *argv[]) {
   bool simple = false, rebuild = false;
@@ -46,7 +47,9 @@ int main(int argc, char *argv[]) {
   map<int, std::string> systemCallNumbers;
   map<std::string, int> systemCallNames;
   map<std::string, systemCallSignature> systemCallSignatures;
+  map<int, std::string> errorConstants;
   compileSystemCallData(systemCallNumbers, systemCallNames, systemCallSignatures, rebuild);
+  compileSystemCallErrorStrings(errorConstants);
 
   int pid = fork();
   if (pid < 0) {
@@ -124,16 +127,22 @@ int main(int argc, char *argv[]) {
           cout << sysCallName << "(" << join(stringArgs, ", ") << ") = ";
         } else {
           cout << "syscall(" << sysCallNum << ") = ";
-          ptrace(PTRACE_SYSCALL, pid, 0, 0);
         }
-
         if (WIFEXITED(status)) {
           cout << "<no return>" << endl;
           break;
-        } else {
-          long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
-          cout << retval << endl;
         }
+
+        long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
+        if (retval < 0) {
+          retval = abs(retval);
+          cout << "-1  " << errorConstants[retval] << " (" << strerror(retval) << ")";
+        } else if (voidStarReturns.find(sysCallName) != voidStarReturns.end()) {
+          cout << (void *) retval;
+        } else {
+          cout << (int) retval;
+        }
+        cout << endl;
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
       } else {
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
