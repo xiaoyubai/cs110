@@ -16,6 +16,7 @@
 #include <set>
 #include <unistd.h> // for fork, execvp
 #include <signal.h>
+#include <sstream>
 #include <string.h> // for memchr, strerror
 #include "string-utils.h"
 #include <sys/ptrace.h>
@@ -86,19 +87,42 @@ int main(int argc, char *argv[]) {
               stringArgs.push_back(to_string((int) regVal));
               break;
             case SYSCALL_STRING: {
-              stringArgs.push_back("some_str");
-//              char *regStr = (char *) ptrace(PTRACE_PEEKDATA, pid, regVal);
-//              stringArgs.push_back(string(regStr));
+              if ((void *) regVal == NULL) {
+                stringArgs.push_back("NULL");
+                break;
+              }
+              // regVal points to a null terminated string
+              string res = "\"";
+              while (true) {
+                bool done = false;
+                long regStr = ptrace(PTRACE_PEEKDATA, pid, regVal);
+                for (size_t i=0; i<sizeof(long); i++) {
+                  char ch = ((char *) &regStr)[i];
+                  res += ch;
+                  if (ch == '\0') {
+                    done = true;
+                    break;
+                  }
+                }
+                regVal += sizeof(long);
+                if (done) break;
+              }
+              res += "\"";
+              stringArgs.push_back(res);
               break;
             }
-            case SYSCALL_POINTER:
-              stringArgs.push_back("some_ptr");
+            case SYSCALL_POINTER: {
+              stringstream ss;
+              if ((void *) regVal != NULL)
+                ss << (void *) regVal;
+              else
+                ss << "NULL";
+              stringArgs.push_back(ss.str());
               break;
+            }
             case SYSCALL_UNKNOWN_TYPE:
-              stringArgs.push_back("some_unknown");
-              break;
-//              fprintf(stderr, "Syscall with unknown param type\n");
-//              return 2;
+              fprintf(stderr, "Syscall with unknown param type\n");
+              return 2;
           }
         }
         long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
