@@ -64,8 +64,12 @@ int main(int argc, char *argv[]) {
       } else if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP2) {
         int syscall = ptrace(PTRACE_PEEKUSER, pid, ORIG_RAX * sizeof(long));
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
-        waitpid(pid, NULL, 0);
+        waitpid(pid, &status, 0);
         long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
+        if (WIFEXITED(status)) {
+          cout << "syscall(" << syscall << ") = <no return>" << endl;
+          break;
+        }
         cout << "syscall(" << syscall << ") = " << retval << endl;
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
       } else {
