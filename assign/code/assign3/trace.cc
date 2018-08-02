@@ -142,15 +142,19 @@ int main(int argc, char *argv[]) {
         }
 
         long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
-        if (retval < 0) {
-          retval = abs(retval);
-          cout << "-1";
-          if (errorConstants.find(retval) != errorConstants.end())
-            cout << " " << errorConstants[retval] << " (" << strerror(retval) << ")";
-        } else if (voidStarReturns.find(sysCallName) != voidStarReturns.end()) {
-          cout << (void *) retval;
+        if (simple) {
+          cout << retval;
         } else {
-          cout << (int) retval;
+          if (retval < 0) {
+            retval = abs(retval);
+            cout << "-1";
+            if (!simple && errorConstants.find(retval) != errorConstants.end())
+              cout << " " << errorConstants[retval] << " (" << strerror(retval) << ")";
+          } else if (voidStarReturns.find(sysCallName) != voidStarReturns.end()) {
+            cout << (void *) retval;
+          } else {
+            cout << (int) retval;
+          }
         }
         cout << endl;
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
