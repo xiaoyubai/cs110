@@ -65,6 +65,7 @@ int main(int argc, char *argv[]) {
     waitpid(pid, NULL, 0);
     ptrace(PTRACE_SETOPTIONS, pid, 0, PTRACE_O_TRACESYSGOOD);
     ptrace(PTRACE_SYSCALL, pid, 0, 0);
+
     int status;
     while (true) {
       waitpid(pid, &status, 0);
@@ -73,8 +74,6 @@ int main(int argc, char *argv[]) {
       } else if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP2) {
         int sysCallNum = ptrace(PTRACE_PEEKUSER, pid, ORIG_RAX * sizeof(long));
         const string sysCallName = systemCallNumbers[sysCallNum];
-        ptrace(PTRACE_SYSCALL, pid, 0, 0);
-        waitpid(pid, &status, 0);
 
         if (!simple) {
           vector<string> stringArgs;
@@ -133,6 +132,10 @@ int main(int argc, char *argv[]) {
         } else {
           cout << "syscall(" << sysCallNum << ") = ";
         }
+
+        ptrace(PTRACE_SYSCALL, pid, 0, 0);
+        waitpid(pid, &status, 0);
+
         if (WIFEXITED(status)) {
           cout << "<no return>" << endl;
           break;
