@@ -22,7 +22,16 @@ void testTrim() {
   assert(trim("   a  b c  ") == "a  b c");
 }
 
+void testJoin() {
+  assert(join({}, "") == "");
+  assert(join({}, "-") == "");
+  assert(join({"abc"}, "-") == "abc");
+  assert(join({"abc", "abc"}, "-") == "abc-abc");
+  assert(join({"abc", "abc"}, "---") == "abc---abc");
+}
+
 int main(int argc, char *argv[]) {
   testStartsWith();
   testTrim();
+  testJoin();
 }

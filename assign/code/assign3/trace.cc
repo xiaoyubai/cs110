@@ -17,6 +17,7 @@
 #include <unistd.h> // for fork, execvp
 #include <signal.h>
 #include <string.h> // for memchr, strerror
+#include "string-utils.h"
 #include <sys/ptrace.h>
 #include <sys/reg.h>
 #include <sys/wait.h>
@@ -27,6 +28,10 @@
 using namespace std;
 
 #define SIGTRAP2 (SIGTRAP | 0x80)
+
+typedef int regtype;
+
+static const regtype argRegisters[] = {RDI, RSI, RDX, R10, R8, R9};
 
 int main(int argc, char *argv[]) {
   bool simple = false, rebuild = false;
@@ -62,16 +67,55 @@ int main(int argc, char *argv[]) {
       if (WIFEXITED(status)) {
         break;
       } else if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP2) {
-        int syscall = ptrace(PTRACE_PEEKUSER, pid, ORIG_RAX * sizeof(long));
+        int sysCallNum = ptrace(PTRACE_PEEKUSER, pid, ORIG_RAX * sizeof(long));
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
         waitpid(pid, &status, 0);
-        long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
         if (WIFEXITED(status)) {
-          cout << "syscall(" << syscall << ") = <no return>" << endl;
+          cout << "syscall(" << sysCallNum << ") = <no return>" << endl;
           break;
         }
-        cout << "syscall(" << syscall << ") = " << retval << endl;
+
+        // NEW
+        const string sysCallName = systemCallNumbers[sysCallNum];
+        const systemCallSignature sysCallSig = systemCallSignatures[sysCallName];
+        vector<string> stringArgs;
+        for (size_t i=0; i<sysCallSig.size(); i++) {
+          long regVal = ptrace(PTRACE_PEEKUSER, pid, argRegisters[i] * sizeof(long));
+          switch (sysCallSig[i]) {
+            case SYSCALL_INTEGER:
+              stringArgs.push_back(to_string((int) regVal));
+              break;
+            case SYSCALL_STRING: {
+              stringArgs.push_back("some_str");
+//              char *regStr = (char *) ptrace(PTRACE_PEEKDATA, pid, regVal);
+//              stringArgs.push_back(string(regStr));
+              break;
+            }
+            case SYSCALL_POINTER:
+              stringArgs.push_back("some_ptr");
+              break;
+            case SYSCALL_UNKNOWN_TYPE:
+              stringArgs.push_back("some_unknown");
+              break;
+//              fprintf(stderr, "Syscall with unknown param type\n");
+//              return 2;
+          }
+        }
+        long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
+        cout << sysCallName
+            << "("
+            << join(stringArgs, ", ")
+            << ") = "
+            << retval
+            << endl;
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
+        // NEW
+
+        // OLD
+//        long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
+//        cout << "syscall(" << sysCallNum << ") = " << retval << endl;
+//        ptrace(PTRACE_SYSCALL, pid, 0, 0);
+        // OLD
       } else {
         ptrace(PTRACE_SYSCALL, pid, 0, 0);
       }

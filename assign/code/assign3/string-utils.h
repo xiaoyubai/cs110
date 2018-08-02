@@ -1,7 +1,20 @@
+#include <algorithm>
 #include <iostream>
 #include <string>
+#include <vector>
 
 using namespace std;
+
+static string join(const vector<string>& strs, const string& delim) {
+  string res;
+  if (strs.empty()) return "";
+  res += strs[0];
+  for (size_t i=1; i<strs.size(); i++) {
+    res += delim;
+    res += strs[i];
+  }
+  return res;
+}
 
 static bool startsWith(const string& a, const string& b) {
   if (a.length() < b.length()) return false;
