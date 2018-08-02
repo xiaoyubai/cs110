@@ -77,51 +77,56 @@ int main(int argc, char *argv[]) {
         waitpid(pid, &status, 0);
 
         if (!simple) {
-          const systemCallSignature sysCallSig = systemCallSignatures[sysCallName];
           vector<string> stringArgs;
-          for (size_t i=0; i<sysCallSig.size(); i++) {
-            long regVal = ptrace(PTRACE_PEEKUSER, pid, argRegisters[i] * sizeof(long));
-            switch (sysCallSig[i]) {
-              case SYSCALL_INTEGER:
-                stringArgs.push_back(to_string((int) regVal));
-                break;
-              case SYSCALL_STRING: {
-                if ((void *) regVal == NULL) {
-                  stringArgs.push_back("NULL");
+          if (systemCallSignatures.find(sysCallName) == systemCallSignatures.end()) {
+            stringArgs.push_back("<signature-information-missing>");
+          }
+          else {
+            const systemCallSignature sysCallSig = systemCallSignatures[sysCallName];
+            for (size_t i=0; i<sysCallSig.size(); i++) {
+              long regVal = ptrace(PTRACE_PEEKUSER, pid, argRegisters[i] * sizeof(long));
+              switch (sysCallSig[i]) {
+                case SYSCALL_INTEGER:
+                  stringArgs.push_back(to_string((int) regVal));
+                  break;
+                case SYSCALL_STRING: {
+                  if ((void *) regVal == NULL) {
+                    stringArgs.push_back("NULL");
+                    break;
+                  }
+                  // regVal points to a null terminated string
+                  string res = "\"";
+                  while (true) {
+                    bool done = false;
+                    long regStr = ptrace(PTRACE_PEEKDATA, pid, regVal);
+                    for (size_t j=0; j<sizeof(long); j++) {
+                      char ch = ((char *) &regStr)[j];
+                      res += ch;
+                      if (ch == '\0') {
+                        done = true;
+                        break;
+                      }
+                    }
+                    regVal += sizeof(long);
+                    if (done) break;
+                  }
+                  res += "\"";
+                  stringArgs.push_back(res);
                   break;
                 }
-                // regVal points to a null terminated string
-                string res = "\"";
-                while (true) {
-                  bool done = false;
-                  long regStr = ptrace(PTRACE_PEEKDATA, pid, regVal);
-                  for (size_t i=0; i<sizeof(long); i++) {
-                    char ch = ((char *) &regStr)[i];
-                    res += ch;
-                    if (ch == '\0') {
-                      done = true;
-                      break;
-                    }
-                  }
-                  regVal += sizeof(long);
-                  if (done) break;
+                case SYSCALL_POINTER: {
+                  stringstream ss;
+                  if ((void *) regVal != NULL)
+                    ss << (void *) regVal;
+                  else
+                    ss << "NULL";
+                  stringArgs.push_back(ss.str());
+                  break;
                 }
-                res += "\"";
-                stringArgs.push_back(res);
-                break;
+                case SYSCALL_UNKNOWN_TYPE:
+                  fprintf(stderr, "Syscall with unknown param type\n");
+                  return 2;
               }
-              case SYSCALL_POINTER: {
-                stringstream ss;
-                if ((void *) regVal != NULL)
-                  ss << (void *) regVal;
-                else
-                  ss << "NULL";
-                stringArgs.push_back(ss.str());
-                break;
-              }
-              case SYSCALL_UNKNOWN_TYPE:
-                fprintf(stderr, "Syscall with unknown param type\n");
-                return 2;
             }
           }
           cout << sysCallName << "(" << join(stringArgs, ", ") << ") = ";
@@ -136,7 +141,9 @@ int main(int argc, char *argv[]) {
         long retval = ptrace(PTRACE_PEEKUSER, pid, RAX * sizeof(long));
         if (retval < 0) {
           retval = abs(retval);
-          cout << "-1  " << errorConstants[retval] << " (" << strerror(retval) << ")";
+          cout << "-1";
+          if (errorConstants.find(retval) != errorConstants.end())
+            cout << " " << errorConstants[retval] << " (" << strerror(retval) << ")";
         } else if (voidStarReturns.find(sysCallName) != voidStarReturns.end()) {
           cout << (void *) retval;
         } else {
@@ -152,7 +159,6 @@ int main(int argc, char *argv[]) {
     cout << "Program exited normally with status " << WEXITSTATUS(status) << endl;
     return WEXITSTATUS(status);
   }
-
 
   return 0;
 }
