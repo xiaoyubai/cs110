@@ -62,14 +62,38 @@ static void installSignalHandlers() {
   installSignalHandler(SIGTTOU, SIG_IGN);
 }
 
+// Helper function to construct the argv array for execvp based on the command
+// and tokens.
+// Assumes that argv has sufficient space.
+static void buildArgv(command& cmd, char *argv[]) {
+  argv[0] = cmd.command;
+  for (size_t i=0; i<kMaxArguments; i++) {
+    argv[i+1] = cmd.tokens[i];
+    if (cmd.tokens[i] == NULL) break;
+  }
+}
+
 /**
  * Function: createJob
  * -------------------
  * Creates a new job on behalf of the provided pipeline.
  */
 static void createJob(const pipeline& p) {
-  cout << p; // remove this line once you get started
-  /* STSHJob& job = */ joblist.addJob(kForeground);
+//  cout << p; // remove this line once you get started
+//  /* STSHJob& job = */ joblist.addJob(kForeground);
+
+  /**
+   * Assuming only single command!
+   */
+  pid_t pid;
+  if ((pid = fork()) == 0) {
+    command cmd = p.commands.front();
+    char *argv[kMaxArguments];
+    buildArgv(cmd, argv);
+    execvp(argv[0], argv);
+  } else {
+    waitpid(pid, NULL, 0);
+  }
 }
 
 /**
