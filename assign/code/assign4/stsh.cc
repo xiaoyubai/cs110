@@ -63,8 +63,7 @@ static void installSignalHandlers() {
 }
 
 // Helper function to construct the argv array for execvp based on the command
-// and tokens.
-// Assumes that argv has sufficient space.
+// and tokens. Assumes that argv has sufficient space.
 static void buildArgv(command& cmd, char *argv[]) {
   argv[0] = cmd.command;
   for (size_t i=0; i<kMaxArguments; i++) {
@@ -87,6 +86,7 @@ static void createJob(const pipeline& p) {
    */
   pid_t pid;
   if ((pid = fork()) == 0) {
+    setpgid(0, 0);
     command cmd = p.commands.front();
     char *argv[kMaxArguments];
     buildArgv(cmd, argv);
