@@ -58,6 +58,18 @@ static void handleSigChld(int sig) {
   joblist.synchronize(job);
 }
 
+static void handleSigInt(int sig) {
+  if (!joblist.hasForegroundJob()) return;
+  STSHJob& fg = joblist.getForegroundJob();
+  kill(-fg.getGroupID(), SIGINT);
+}
+
+static void handleSigTstp(int sig) {
+  if (!joblist.hasForegroundJob()) return;
+  STSHJob& fg = joblist.getForegroundJob();
+  kill(-fg.getGroupID(), SIGTSTP);
+}
+
 /**
  * Function: installSignalHandlers
  * -------------------------------
@@ -71,6 +83,8 @@ static void installSignalHandlers() {
   installSignalHandler(SIGTTIN, SIG_IGN);
   installSignalHandler(SIGTTOU, SIG_IGN);
   installSignalHandler(SIGCHLD, handleSigChld);
+  installSignalHandler(SIGINT, handleSigInt);
+  installSignalHandler(SIGTSTP, handleSigTstp);
 }
 
 // Helper function to construct the argv array for execvp based on the command
