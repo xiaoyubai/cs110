@@ -78,21 +78,25 @@ static void buildArgv(command& cmd, char *argv[]) {
  * Creates a new job on behalf of the provided pipeline.
  */
 static void createJob(const pipeline& p) {
-//  cout << p; // remove this line once you get started
-//  /* STSHJob& job = */ joblist.addJob(kForeground);
-
   /**
    * Assuming only single command!
    */
   pid_t pid;
+  command cmd = p.commands.front();
   if ((pid = fork()) == 0) {
     setpgid(0, 0);
-    command cmd = p.commands.front();
     char *argv[kMaxArguments];
     buildArgv(cmd, argv);
     execvp(argv[0], argv);
   } else {
+    // TODO: Block signals while adding this to job list.
+    STSHJob& job = joblist.addJob(kForeground);
+    STSHProcess proc(pid, cmd);
+    job.addProcess(proc);
+
     waitpid(pid, NULL, 0);
+    job.getProcess(pid).setState(kTerminated);
+    joblist.synchronize(job);
   }
 }
 
