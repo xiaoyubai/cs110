@@ -48,6 +48,16 @@ static bool handleBuiltin(const pipeline& pipeline) {
   return true;
 }
 
+static void handleSigChld(int sig) {
+  /**
+   * This assumes only a single foreground process / job.
+   */
+  pid_t pid = waitpid(-1, NULL, 0);
+  STSHJob& job = joblist.getJobWithProcess(pid);
+  job.getProcess(pid).setState(kTerminated);
+  joblist.synchronize(job);
+}
+
 /**
  * Function: installSignalHandlers
  * -------------------------------
@@ -60,6 +70,7 @@ static void installSignalHandlers() {
   installSignalHandler(SIGQUIT, [](int sig) { exit(0); });
   installSignalHandler(SIGTTIN, SIG_IGN);
   installSignalHandler(SIGTTOU, SIG_IGN);
+  installSignalHandler(SIGCHLD, handleSigChld);
 }
 
 // Helper function to construct the argv array for execvp based on the command
@@ -94,9 +105,13 @@ static void createJob(const pipeline& p) {
     STSHProcess proc(pid, cmd);
     job.addProcess(proc);
 
-    waitpid(pid, NULL, 0);
-    job.getProcess(pid).setState(kTerminated);
-    joblist.synchronize(job);
+    sigset_t oldMask, extraMask;
+    sigemptyset(&extraMask);
+    sigaddset(&extraMask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &extraMask, &oldMask);
+    while (joblist.hasForegroundJob())
+      sigsuspend(&oldMask);
+    sigprocmask(SIG_UNBLOCK, &extraMask, NULL);
   }
 }
 
