@@ -57,10 +57,12 @@ static void handleSigChld(int sig) {
    * This assumes only a single foreground process / job.
    */
   int status;
-  pid_t pid = waitpid(-1, &status, WUNTRACED);
+  pid_t pid = waitpid(-1, &status, WUNTRACED | WCONTINUED);
   STSHJob& job = joblist.getJobWithProcess(pid);
   if (WIFSTOPPED(status)) {
     job.getProcess(pid).setState(kStopped);
+  } else if (WIFCONTINUED(status)) {
+    return;
   } else {
     assert(WIFEXITED(status));
     job.getProcess(pid).setState(kTerminated);
@@ -111,13 +113,17 @@ static void executeFgCommand(const pipeline& pipeline) {
 
   try {
     // check for proper integer
-    int job = stoi(cmd.tokens[0]);
+    int jobNum = stoi(cmd.tokens[0]);
     // check for unsigned int
-    if (job <= 0) throw STSHException("Job number must be positive.");
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
     // check for valid job in joblist
-    if (!joblist.containsJob(job)) throw STSHException("Job is not a valid job number.");
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
     // forward SIGCONT to job
-    kill(-job, SIGCONT);
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(-job.getGroupID(), SIGCONT);
+    job.setState(kForeground);
+    job.getProcesses()[0].setState(kRunning);
+    // print command to terminal
   } catch (invalid_argument& ia) {
     throw STSHException("Job number must be an integer.");
   }
@@ -155,15 +161,17 @@ static void createJob(const pipeline& p) {
     STSHJob& job = joblist.addJob(kForeground);
     STSHProcess proc(pid, cmd);
     job.addProcess(proc);
-
-    sigset_t oldMask, extraMask;
-    sigemptyset(&extraMask);
-    sigaddset(&extraMask, SIGCHLD);
-    sigprocmask(SIG_BLOCK, &extraMask, &oldMask);
-    while (joblist.hasForegroundJob())
-      sigsuspend(&oldMask);
-    sigprocmask(SIG_UNBLOCK, &extraMask, NULL);
   }
+}
+
+static void suspendForForeground() {
+  sigset_t oldMask, extraMask;
+  sigemptyset(&extraMask);
+  sigaddset(&extraMask, SIGCHLD);
+  sigprocmask(SIG_BLOCK, &extraMask, &oldMask);
+  while (joblist.hasForegroundJob())
+    sigsuspend(&oldMask);
+  sigprocmask(SIG_UNBLOCK, &extraMask, NULL);
 }
 
 /**
@@ -185,6 +193,7 @@ int main(int argc, char *argv[]) {
       pipeline p(line);
       bool builtin = handleBuiltin(p);
       if (!builtin) createJob(p);
+      suspendForForeground();
     } catch (const STSHException& e) {
       cerr << e.what() << endl;
       if (getpid() != stshpid) exit(0); // if exception is thrown from child process, kill it
