@@ -62,7 +62,7 @@ static void handleSigChld(int sig) {
   if (WIFSTOPPED(status)) {
     job.getProcess(pid).setState(kStopped);
   } else if (WIFCONTINUED(status)) {
-    return;
+    job.getProcesses()[0].setState(kRunning);
   } else {
     assert(WIFEXITED(status));
     job.getProcess(pid).setState(kTerminated);
@@ -122,7 +122,6 @@ static void executeFgCommand(const pipeline& pipeline) {
     STSHJob& job = joblist.getJob(jobNum);
     kill(-job.getGroupID(), SIGCONT);
     job.setState(kForeground);
-    job.getProcesses()[0].setState(kRunning);
     // print command to terminal
   } catch (invalid_argument& ia) {
     throw STSHException("Job number must be an integer.");
