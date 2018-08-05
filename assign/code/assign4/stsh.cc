@@ -19,10 +19,12 @@
 #include <fcntl.h>
 #include <unistd.h>  // for fork
 #include <signal.h>  // for kill
+#include <setjmp.h>
 #include <sys/wait.h>
 using namespace std;
 
 static STSHJobList joblist; // the one piece of global data we need so signal handlers can access it
+static sigjmp_buf env;
 
 static void executeFgCommand(const pipeline& pipeline);
 
@@ -72,15 +74,21 @@ static void handleSigChld(int sig) {
 }
 
 static void handleSigInt(int sig) {
-  if (!joblist.hasForegroundJob()) return;
-  STSHJob& fg = joblist.getForegroundJob();
-  kill(-fg.getGroupID(), SIGINT);
+  cout << endl;
+  if (joblist.hasForegroundJob()) {
+    STSHJob& fg = joblist.getForegroundJob();
+    kill(-fg.getGroupID(), SIGINT);
+  }
+  siglongjmp(env, 1);
 }
 
 static void handleSigTstp(int sig) {
-  if (!joblist.hasForegroundJob()) return;
-  STSHJob& fg = joblist.getForegroundJob();
-  kill(-fg.getGroupID(), SIGTSTP);
+  cout << endl;
+  if (joblist.hasForegroundJob()) {
+    STSHJob& fg = joblist.getForegroundJob();
+    kill(-fg.getGroupID(), SIGTSTP);
+  }
+  siglongjmp(env, 1);
 }
 
 /**
@@ -187,6 +195,7 @@ int main(int argc, char *argv[]) {
   rlinit(argc, argv);
   while (true) {
     string line;
+    sigsetjmp(env, 1);
     if (!readline(line)) break;
     if (line.empty()) continue;
     try {
