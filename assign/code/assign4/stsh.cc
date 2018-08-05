@@ -62,7 +62,7 @@ static void handleSigChld(int sig) {
   if (WIFSTOPPED(status)) {
     job.getProcess(pid).setState(kStopped);
   } else if (WIFCONTINUED(status)) {
-    job.getProcesses()[0].setState(kRunning);
+    job.getProcess(pid).setState(kRunning);
   } else {
     assert(WIFEXITED(status));
     job.getProcess(pid).setState(kTerminated);
