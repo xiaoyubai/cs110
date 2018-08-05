@@ -74,7 +74,7 @@ static void handleSigChld(int sig) {
   } else if (WIFCONTINUED(status)) {
     job.getProcess(pid).setState(kRunning);
   } else {
-    assert(WIFEXITED(status));
+    assert(WIFEXITED(status) || WIFSIGNALED(status));
     job.getProcess(pid).setState(kTerminated);
   }
 
@@ -123,8 +123,8 @@ static void executeFgCommand(const pipeline& pipeline) {
     if (cmd.tokens[numToks] == NULL) break;
   }
 
-  if (numToks < 1) {
-    throw STSHException("fg takes at least one argument.");
+  if (numToks != 1) {
+    throw STSHException("fg takes one argument.");
   }
 
   try {
@@ -145,7 +145,32 @@ static void executeFgCommand(const pipeline& pipeline) {
 }
 
 static void executeBgCommand(const pipeline& pipeline) {
-  return;
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks != 1) {
+    throw STSHException("bg takes one argument.");
+  }
+
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+    // forward SIGCONT to job
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(-job.getGroupID(), SIGCONT);
+    job.setState(kBackground);
+    // print command to terminal
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job number must be an integer.");
+  }
+
 }
 
 static void executeSlayCommand(const pipeline& pipeline) {
