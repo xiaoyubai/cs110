@@ -27,6 +27,10 @@ static STSHJobList joblist; // the one piece of global data we need so signal ha
 static sigjmp_buf env;
 
 static void executeFgCommand(const pipeline& pipeline);
+static void executeBgCommand(const pipeline& pipeline);
+static void executeSlayCommand(const pipeline& pipeline);
+static void executeHaltCommand(const pipeline& pipeline);
+static void executeContCommand(const pipeline& pipeline);
 
 /**
  * Function: handleBuiltin
@@ -47,6 +51,10 @@ static bool handleBuiltin(const pipeline& pipeline) {
   case 0:
   case 1: exit(0);
   case 2: executeFgCommand(pipeline); break;
+  case 3: executeBgCommand(pipeline); break;
+  case 4: executeSlayCommand(pipeline); break;
+  case 5: executeHaltCommand(pipeline); break;
+  case 6: executeContCommand(pipeline); break;
   case 7: cout << joblist; break;
   default: throw STSHException("Internal Error: Builtin command not supported."); // or not implemented yet
   }
@@ -134,7 +142,22 @@ static void executeFgCommand(const pipeline& pipeline) {
   } catch (invalid_argument& ia) {
     throw STSHException("Job number must be an integer.");
   }
+}
 
+static void executeBgCommand(const pipeline& pipeline) {
+  return;
+}
+
+static void executeSlayCommand(const pipeline& pipeline) {
+  return;
+}
+
+static void executeHaltCommand(const pipeline& pipeline) {
+  return;
+}
+
+static void executeContCommand(const pipeline& pipeline) {
+  return;
 }
 
 // Helper function to construct the argv array for execvp based on the command
