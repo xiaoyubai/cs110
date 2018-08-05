@@ -173,8 +173,44 @@ static void executeBgCommand(const pipeline& pipeline) {
 
 }
 
+static void slayProc(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int pid = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (pid <= 0) throw STSHException("Process id must be positive.");
+    // check for valid job in joblist
+    STSHJob& job = joblist.getJobWithProcess(pid);
+    if (job.getNum() == 0) throw STSHException("Process id does not belong to a valid process.");
+    kill(pid, SIGKILL);
+  } catch (invalid_argument& ia) {
+    throw STSHException("Process id must be an integer.");
+  }
+}
+
+static void slayJob(const pipeline& pipeline) {
+
+}
+
 static void executeSlayCommand(const pipeline& pipeline) {
-  return;
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks < 1) {
+    throw STSHException("bg takes at least one argument.");
+  } else if (numToks > 2) {
+    throw STSHException("bg takes at most two arguments.");
+  }
+
+  if (numToks == 1) {
+    slayProc(pipeline);
+  } else {
+    slayJob(pipeline);
+  }
 }
 
 static void executeHaltCommand(const pipeline& pipeline) {
