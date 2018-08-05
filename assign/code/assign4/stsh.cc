@@ -234,27 +234,123 @@ static void executeSlayCommand(const pipeline& pipeline) {
 }
 
 static void haltProc(const pipeline& pipeline) {
-  return;
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int pid = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (pid <= 0) throw STSHException("Process id must be positive.");
+    // check for valid job in joblist
+    STSHJob& job = joblist.getJobWithProcess(pid);
+    if (job.getNum() == 0) throw STSHException("Process id does not belong to a valid process.");
+    kill(pid, SIGSTOP);
+  } catch (invalid_argument& ia) {
+    throw STSHException("Process id must be an integer.");
+  }
 }
 
 static void haltJobIndex(const pipeline& pipeline) {
-  return;
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    int index = stoi(cmd.tokens[1]);
+
+    // check for unsigned int and non-negative index
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    if (index < 0) throw STSHException("Index must be non-negative.");
+
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(job.getProcesses().at(index).getID(), SIGSTOP);
+
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job id and index must be integers.");
+  } catch (out_of_range& oor) {
+    throw STSHException("Index is not valid within job id.");
+  }
 }
 
 static void executeHaltCommand(const pipeline& pipeline) {
-  return;
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks < 1) {
+    throw STSHException("halt takes at least one argument.");
+  } else if (numToks > 2) {
+    throw STSHException("halt takes at most two arguments.");
+  }
+
+  if (numToks == 1) {
+    haltProc(pipeline);
+  } else {
+    haltJobIndex(pipeline);
+  }
 }
 
 static void contProc(const pipeline& pipeline) {
-  return;
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int pid = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (pid <= 0) throw STSHException("Process id must be positive.");
+    // check for valid job in joblist
+    STSHJob& job = joblist.getJobWithProcess(pid);
+    if (job.getNum() == 0) throw STSHException("Process id does not belong to a valid process.");
+    kill(pid, SIGCONT);
+  } catch (invalid_argument& ia) {
+    throw STSHException("Process id must be an integer.");
+  }
 }
 
 static void contJobIndex(const pipeline& pipeline) {
-  return;
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    int index = stoi(cmd.tokens[1]);
+
+    // check for unsigned int and non-negative index
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    if (index < 0) throw STSHException("Index must be non-negative.");
+
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(job.getProcesses().at(index).getID(), SIGCONT);
+
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job id and index must be integers.");
+  } catch (out_of_range& oor) {
+    throw STSHException("Index is not valid within job id.");
+  }
 }
 
 static void executeContCommand(const pipeline& pipeline) {
-  return;
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks < 1) {
+    throw STSHException("cont takes at least one argument.");
+  } else if (numToks > 2) {
+    throw STSHException("cont takes at most two arguments.");
+  }
+
+  if (numToks == 1) {
+    contProc(pipeline);
+  } else {
+    contJobIndex(pipeline);
+  }
 }
 
 // Helper function to construct the argv array for execvp based on the command
