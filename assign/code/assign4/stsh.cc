@@ -23,6 +23,8 @@ using namespace std;
 
 static STSHJobList joblist; // the one piece of global data we need so signal handlers can access it
 
+static void executeFgCommand(const pipeline& pipeline);
+
 /**
  * Function: handleBuiltin
  * -----------------------
@@ -41,6 +43,7 @@ static bool handleBuiltin(const pipeline& pipeline) {
   switch (index) {
   case 0:
   case 1: exit(0);
+  case 2: executeFgCommand(pipeline); break;
   case 7: cout << joblist; break;
   default: throw STSHException("Internal Error: Builtin command not supported."); // or not implemented yet
   }
@@ -85,6 +88,32 @@ static void installSignalHandlers() {
   installSignalHandler(SIGCHLD, handleSigChld);
   installSignalHandler(SIGINT, handleSigInt);
   installSignalHandler(SIGTSTP, handleSigTstp);
+}
+
+static void executeFgCommand(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks < 1) {
+    throw STSHException("fg takes at least one argument.");
+  }
+
+  try {
+    // check for proper integer
+    int job = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (job <= 0) throw STSHException("Job number must be positive.");
+    // check for valid job in joblist
+    if (!joblist.containsJob(job)) throw STSHException("Job is not a valid job number.");
+    // forward SIGCONT to job
+    kill(-job, SIGCONT);
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job number must be an integer.");
+  }
+
 }
 
 // Helper function to construct the argv array for execvp based on the command
