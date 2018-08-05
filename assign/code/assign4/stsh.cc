@@ -11,6 +11,7 @@
 #include "stsh-job-list.h"
 #include "stsh-job.h"
 #include "stsh-process.h"
+#include <assert.h>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -55,9 +56,16 @@ static void handleSigChld(int sig) {
   /**
    * This assumes only a single foreground process / job.
    */
-  pid_t pid = waitpid(-1, NULL, 0);
+  int status;
+  pid_t pid = waitpid(-1, &status, WUNTRACED);
   STSHJob& job = joblist.getJobWithProcess(pid);
-  job.getProcess(pid).setState(kTerminated);
+  if (WIFSTOPPED(status)) {
+    job.getProcess(pid).setState(kStopped);
+  } else {
+    assert(WIFEXITED(status));
+    job.getProcess(pid).setState(kTerminated);
+  }
+
   joblist.synchronize(job);
 }
 
