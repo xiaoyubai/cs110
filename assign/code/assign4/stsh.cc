@@ -189,7 +189,7 @@ static void slayProc(const pipeline& pipeline) {
   }
 }
 
-static void slayJob(const pipeline& pipeline) {
+static void slayJobIndex(const pipeline& pipeline) {
   command cmd = pipeline.commands.front();
   try {
     // check for proper integer
@@ -229,11 +229,27 @@ static void executeSlayCommand(const pipeline& pipeline) {
   if (numToks == 1) {
     slayProc(pipeline);
   } else {
-    slayJob(pipeline);
+    slayJobIndex(pipeline);
   }
 }
 
+static void haltProc(const pipeline& pipeline) {
+  return;
+}
+
+static void haltJobIndex(const pipeline& pipeline) {
+  return;
+}
+
 static void executeHaltCommand(const pipeline& pipeline) {
+  return;
+}
+
+static void contProc(const pipeline& pipeline) {
+  return;
+}
+
+static void contJobIndex(const pipeline& pipeline) {
   return;
 }
 
