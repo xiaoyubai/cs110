@@ -78,7 +78,19 @@ static void handleSigChld(int sig) {
     job.getProcess(pid).setState(kTerminated);
   }
 
+  bool wasFg = (job.getState() == kForeground);
+
   joblist.synchronize(job);
+
+  // reattach terminal appropriately
+  if (!wasFg) return;
+  if (WIFCONTINUED(status)) {
+    tcsetpgrp(STDIN_FILENO, job.getGroupID());
+  } else {
+    assert(WIFSTOPPED(status) || WIFSIGNALED(status) || WIFEXITED(status));
+    tcsetpgrp(STDIN_FILENO, getpgrp());
+  }
+
 }
 
 static void handleSigInt(int sig) {
@@ -382,9 +394,14 @@ static void createJob(const pipeline& p) {
     throw STSHException("Command not found.");
   } else {
     // TODO: Block signals while adding this to job list.
+    setpgid(pid, pid);
     STSHJob& job = joblist.addJob((p.background) ? kBackground : kForeground);
     STSHProcess proc(pid, cmd);
     job.addProcess(proc);
+    if (!p.background) {
+      if (tcsetpgrp(STDIN_FILENO, pid) == -1 && errno != ENOTTY)
+        throw STSHException(strerror(errno));
+    }
   }
 }
 
