@@ -155,6 +155,7 @@ static void createJob(const pipeline& p) {
     char *argv[kMaxArguments];
     buildArgv(cmd, argv);
     execvp(argv[0], argv);
+    throw STSHException("Command not found.");
   } else {
     // TODO: Block signals while adding this to job list.
     STSHJob& job = joblist.addJob((p.background) ? kBackground : kForeground);
