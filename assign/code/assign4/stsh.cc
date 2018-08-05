@@ -157,7 +157,7 @@ static void createJob(const pipeline& p) {
     execvp(argv[0], argv);
   } else {
     // TODO: Block signals while adding this to job list.
-    STSHJob& job = joblist.addJob(kForeground);
+    STSHJob& job = joblist.addJob((p.background) ? kBackground : kForeground);
     STSHProcess proc(pid, cmd);
     job.addProcess(proc);
   }
