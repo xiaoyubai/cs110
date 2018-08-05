@@ -190,7 +190,27 @@ static void slayProc(const pipeline& pipeline) {
 }
 
 static void slayJob(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    int index = stoi(cmd.tokens[1]);
 
+    // check for unsigned int and non-negative index
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    if (index < 0) throw STSHException("Index must be non-negative.");
+
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(job.getProcesses().at(index).getID(), SIGKILL);
+
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job id and index must be integers.");
+  } catch (out_of_range& oor) {
+    throw STSHException("Index is not valid within job id.");
+  }
 }
 
 static void executeSlayCommand(const pipeline& pipeline) {
