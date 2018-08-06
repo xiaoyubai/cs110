@@ -11,10 +11,6 @@
 #include <string>
 #include "log.h"
 #include "rss-index.h"
-#include <unordered_set>
-#include <mutex>
-
-using namespace std;
 
 class NewsAggregator {
   
@@ -64,14 +60,6 @@ class NewsAggregator {
   std::string rssFeedListURI;
   RSSIndex index;
   bool built;
-
-  const static int childMaxNum = 5;
-  const static int grandchildMaxNum = 8;
-  const static int grandchildLimit = 18;
-
-  static std::mutex indexLock;
-  static std::mutex urlSetLock;
-  static std::unordered_set<std::string> urlSet;
   
 /**
  * Constructor: NewsAggregator
@@ -88,8 +76,7 @@ class NewsAggregator {
  * You need to implement this function.
  */
   void processAllFeeds();
-  void feed2articles(std::map<std::string, std::string> feeds);
-  void article2tokens(std::vector<Article>);
+
 /**
  * Copy Constructor, Assignment Operator
  * -------------------------------------

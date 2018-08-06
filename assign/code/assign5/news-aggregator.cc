@@ -11,14 +11,7 @@
 #include <libxml/parser.h>
 #include <libxml/catalog.h>
 // you will almost certainly need to add more system header includes
-#include <unordered_map>
-#include <unordered_set>
-#include <assert.h>
 
-#include <mutex>
-#include <thread>
-#include "semaphore.h"
-#include <condition_variable>
 // I'm not giving away too much detail here by leaking the #includes below,
 // which contribute to the official CS110 staff solution.
 #include "rss-feed.h"
@@ -31,12 +24,6 @@
 #include "ostreamlock.h"
 #include "string-utils.h"
 using namespace std;
-
-// definition (as opposed to declaration)
-std::mutex NewsAggregator::indexLock;
-std::mutex NewsAggregator::urlSetLock;
-// std::mutex NewsAggregator::titleMapLock;
-std::unordered_set<std::string> NewsAggregator::urlSet;
 
 /**
  * Factory Method: createNewsAggregator
@@ -161,125 +148,5 @@ NewsAggregator::NewsAggregator(const string& rssFeedListURI, bool verbose):
  * method using multithreading while respecting the imposed constraints
  * outlined in the spec.
  */
-const static bool debug = false;
-void NewsAggregator::processAllFeeds() {
-	// start to deal with feed list
-	RSSFeedList rssFeedList(rssFeedListURI);
-	try{
-		rssFeedList.parse();
-	} catch(const RSSFeedListException& rfle) {
-		log.noteFullRSSFeedListDownloadFailureAndExit(rssFeedListURI);
-		return;
-	}
-	log.noteFullRSSFeedListDownloadEnd();
-	const auto& feeds = rssFeedList.getFeeds();	// std::map<std::string, std::string> feeds;
-	feed2articles(feeds);
-	log.noteAllRSSFeedsDownloadEnd();
-}
 
-void NewsAggregator::feed2articles(std::map<std::string, std::string> feeds){
-	vector<thread> childThreads;
-	semaphore childPermits(childMaxNum);
-	// start to deal with feed
-	for(auto it = feeds.begin(); it != feeds.end(); it++) {
-		childPermits.wait();
-		childThreads.push_back(thread([this, it](semaphore& s) {
-					s.signal(on_thread_exit);
-					// thread-safe code starts
-					std::string xmlUrl = it->first;
-					std::string xmlTitle = it->second;
-					urlSetLock.lock();
-					if(urlSet.count(xmlUrl)) {
-						log.noteSingleFeedDownloadSkipped(xmlUrl);
-						urlSetLock.unlock();
-						// continue;	// avoid duplicate url 
-						return;
-					} else {
-						urlSet.insert(xmlUrl);
-						urlSetLock.unlock();
-					}
-					RSSFeed rssFeed(xmlUrl);
-					log.noteSingleFeedDownloadBeginning(xmlTitle);
-					try{
-						rssFeed.parse();
-					} catch(const RSSFeedException& rfe) {
-						log.noteSingleFeedDownloadFailure(xmlUrl);
-						return;
-					}
-					log.noteSingleFeedDownloadEnd(xmlUrl);
-					const auto& articles = rssFeed.getArticles(); // std::vector<Article>& articles
-					article2tokens(articles); // start a new method
-					log.noteAllArticlesHaveBeenScheduled(xmlTitle);
-					// thread-safe code ends
-		}, ref(childPermits)));
-	}
-	for (thread& t: childThreads) t.join();
-}
-
-
-void NewsAggregator::article2tokens(std::vector<Article> articles) {
-	vector<thread> grandchildThreads;
-	semaphore grandchildPermits1(grandchildMaxNum);
-	semaphore grandchildPermits2(grandchildLimit);
-	std::unordered_map<std::string, pair<Article, std::vector<std::string> > > titleMap;
-	std::mutex titleMapLock;
-	// start to deal with html
-	for(auto iter = articles.begin(); iter != articles.end(); iter++) {
-		grandchildPermits1.wait();
-		grandchildPermits2.wait();
-		grandchildThreads.push_back(thread([this, iter, &titleMap, &titleMapLock](semaphore& s1, semaphore& s2) {
-					s1.signal(on_thread_exit);
-					s2.signal(on_thread_exit);
-					// thread-safe code starts
-					Article article = *iter;
-					std::string htmlUrl = iter->url;
-					std::string htmlTitle = iter->title;
-					urlSetLock.lock();
-					if(urlSet.count(htmlUrl)) {
-						log.noteSingleArticleDownloadSkipped(article);
-						urlSetLock.unlock();
-						// continue;	// avoid duplicate url 
-						return;
-					} else {
-						urlSet.insert(htmlUrl);
-						urlSetLock.unlock();
-					}
-						HTMLDocument htmlDocument(htmlUrl);
-						log.noteSingleArticleDownloadBeginning(article);
-					try{
-						htmlDocument.parse();
-					} catch(const HTMLDocumentException& hde) {
-						log.noteSingleArticleDownloadFailure(article);
-						return;
-					}
-					const auto& const_tokens = htmlDocument.getTokens(); // std::vector<std::string> tokens;
-					vector<std::string> tokens(const_tokens.begin(), const_tokens.end());
-					sort(tokens.begin(), tokens.end());
-					assert(is_sorted(tokens.cbegin(), tokens.cend()));
-					titleMapLock.lock();
-					if(titleMap.count(htmlTitle)) {
-						// retrieve old values
-						string oldUrl = titleMap[htmlTitle].first.url;
-						vector<string> oldTokens = titleMap[htmlTitle].second;
-						// populate new values
-						string newUrl = oldUrl < htmlUrl ? oldUrl : htmlUrl;
-						vector<string> newTokens;
-						set_intersection(oldTokens.cbegin(), oldTokens.cend(), tokens.cbegin(), tokens.cend(), back_inserter(newTokens));
-						// add to titleMap 
-						article.url = newUrl;
-						titleMap[htmlTitle] = make_pair(article, newTokens);
-						titleMapLock.unlock();
-					} else {
-						titleMap[htmlTitle] = make_pair(article, tokens);
-						titleMapLock.unlock();
-					}
-					// thread-safe code ends
-		}, ref(grandchildPermits1), ref(grandchildPermits2)));
-	}
-	for (thread& t: grandchildThreads) t.join();
-	for(auto itt = titleMap.begin(); itt != titleMap.end(); itt++) {
-		indexLock.lock();
-		index.add(itt->second.first, itt->second.second);
-		indexLock.unlock();
-	}
-}
+void NewsAggregator::processAllFeeds() {}
