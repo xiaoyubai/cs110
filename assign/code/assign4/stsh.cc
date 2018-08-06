@@ -375,6 +375,12 @@ static void buildArgv(command& cmd, char *argv[]) {
   }
 }
 
+static void swapFds(int **fd1, int **fd2) {
+  int **temp = fd2;
+  *fd2 = *fd1;
+  *fd1 = *temp;
+}
+
 /**
  * Function: createJob
  * -------------------
@@ -382,27 +388,63 @@ static void buildArgv(command& cmd, char *argv[]) {
  */
 static void createJob(const pipeline& p) {
   /**
-   * Assuming only single command!
+   * TODO: Block signals while adding to joblist.
    */
   pid_t pid;
-  command cmd = p.commands.front();
-  if ((pid = fork()) == 0) {
-    setpgid(0, 0);
-    char *argv[kMaxArguments];
-    buildArgv(cmd, argv);
-    execvp(argv[0], argv);
-    throw STSHException("Command not found.");
-  } else {
-    // TODO: Block signals while adding this to job list.
-    setpgid(pid, pid);
-    STSHJob& job = joblist.addJob((p.background) ? kBackground : kForeground);
-    STSHProcess proc(pid, cmd);
-    job.addProcess(proc);
-    if (!p.background) {
-      if (tcsetpgrp(STDIN_FILENO, pid) == -1 && errno != ENOTTY)
-        throw STSHException(strerror(errno));
+  pid_t pgid = 0;
+  assert(!p.commands.empty());
+  STSHJob& job = joblist.addJob((p.background) ? kBackground : kForeground);
+
+  int fds1[2], fds2[2];
+  int *readFds = fds1, *writeFds = fds2;
+  pipe(readFds);
+  pipe(writeFds);
+
+  for (size_t i=0; i<p.commands.size(); i++) {
+    auto cmd = p.commands[i];
+    if (i == 0) { // close readFds for first proc
+      close(readFds[1]);
+    }
+    if (i == p.commands.size() - 1) { // close writeFds for last proc
+      close(writeFds[0]);
+    }
+
+    if ((pid = fork()) == 0) {
+      setpgid(0, pgid);
+
+      if (pgid) dup2(readFds[0], STDIN_FILENO);
+      close(readFds[0]);
+
+      if (i != p.commands.size()-1) dup2(writeFds[1], STDOUT_FILENO);
+      close(writeFds[1]);
+
+      char *argv[kMaxArguments];
+      buildArgv(cmd, argv);
+      execvp(argv[0], argv);
+      throw STSHException("Command " + string(cmd.command) + "failed: " + strerror(errno));
+    } else {
+      if (pgid == 0) pgid = pid;
+      setpgid(pid, pgid);
+
+      STSHProcess proc(pid, cmd);
+      job.addProcess(proc);
+
+      close(readFds[0]);
+      close(writeFds[1]);
+      pipe(readFds);
+
+      if (i != p.commands.size() - 1) {
+        int *temp = readFds;
+        readFds = writeFds;
+        writeFds = temp;
+//      swapFds(&readFds, &writeFds);
+      }
     }
   }
+
+  if (p.background) return;
+  if (tcsetpgrp(STDIN_FILENO, pgid) == -1 && errno != ENOTTY)
+    throw STSHException(strerror(errno));
 }
 
 static void suspendForForeground() {
