@@ -413,15 +413,28 @@ static void createJob(const pipeline& p) {
       setpgid(0, pgid);
 
       if (pgid) dup2(readFds[0], STDIN_FILENO);
+      else if (!p.input.empty()) {
+        int fd;
+        if ((fd = open(p.input.c_str(), O_RDONLY)) == -1)
+          throw STSHException(string("Failed to open input file: ") + strerror(errno));
+        dup2(fd, STDIN_FILENO);
+
+      }
       close(readFds[0]);
 
       if (i != p.commands.size()-1) dup2(writeFds[1], STDOUT_FILENO);
+      else if (!p.output.empty()) {
+        int fd;
+        if ((fd = open(p.output.c_str(), O_WRONLY | O_CREAT | O_TRUNC , 0644)) == -1)
+          throw STSHException(string("Failed to open output file: ") + strerror(errno));
+        dup2(fd, STDOUT_FILENO);
+      }
       close(writeFds[1]);
 
       char *argv[kMaxArguments];
       buildArgv(cmd, argv);
       execvp(argv[0], argv);
-      throw STSHException("Command " + string(cmd.command) + "failed: " + strerror(errno));
+      throw STSHException("Command " + string(cmd.command) + " failed: " + strerror(errno));
     } else {
       if (pgid == 0) pgid = pid;
       setpgid(pid, pgid);
