@@ -11,6 +11,7 @@
 #include "stsh-job-list.h"
 #include "stsh-job.h"
 #include "stsh-process.h"
+#include <assert.h>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -18,122 +19,19 @@
 #include <fcntl.h>
 #include <unistd.h>  // for fork
 #include <signal.h>  // for kill
+#include <setjmp.h>
 #include <sys/wait.h>
-#include <assert.h>
-#include <iomanip>
 using namespace std;
 
 static STSHJobList joblist; // the one piece of global data we need so signal handlers can access it
+static sigjmp_buf env;
 
-static void handle_fg(const pipeline& pipeline) {
-	sigset_t additions, existingmask;
-	sigemptyset(&additions);
-	sigaddset(&additions, SIGCHLD);
-	sigaddset(&additions, SIGINT);
-	sigaddset(&additions, SIGTSTP);
-	sigaddset(&additions, SIGCONT);
-	sigprocmask(SIG_BLOCK, &additions, &existingmask);
+static void executeFgCommand(const pipeline& pipeline);
+static void executeBgCommand(const pipeline& pipeline);
+static void executeSlayCommand(const pipeline& pipeline);
+static void executeHaltCommand(const pipeline& pipeline);
+static void executeContCommand(const pipeline& pipeline);
 
-	char* token = pipeline.commands[0].tokens[0];
-	if(token == NULL) throw STSHException("Usage: fg <jobid>.");
-	if(strcmp(token, "0") == 0) throw STSHException("fg 0: No such job.");	
-	int jobId = atoi(token);
-	if(jobId == 0) throw STSHException("Usage: fg <jobid>.");
-	if(!joblist.containsJob(jobId)) throw STSHException("fg " + to_string(jobId) + ": No such job.");	
-	STSHJob& job = joblist.getJob(jobId);
-	// job.setState(kForeground);
-	// pid_t pgid = job.getGroupID();
-	// kill(-pgid, SIGCONT);
-	vector<STSHProcess>& processes = job.getProcesses();
-	for(unsigned int i = 0; i < processes.size(); i++) {
-		STSHProcess &process = processes[i];
-		int err = kill(process.getID(), SIGCONT);
-		if(err == 0) {
-			job.setState(kForeground);
-		}
-	}
-
-	while(joblist.hasForegroundJob()) {
-		sigsuspend(&existingmask);
-	}
-	sigprocmask(SIG_UNBLOCK, &additions, NULL);
-}
-
-static void handle_bg(const pipeline& p) {
-	char* one = p.commands[0].tokens[0];
-	if(one == nullptr) throw STSHException("Usage: bg <jobid>.");
-	char* two = p.commands[0].tokens[1];
-	int iOne = atoi(one);
-	if(two == nullptr) { 	// one parameter: only pid
-		if(!joblist.containsProcess(iOne)) throw STSHException("No process with pid " + to_string(iOne));
-		kill(iOne, SIGCONT);
-	} else {				// two parameters: job id and pid
-		int iTwo = atoi(two);
-		if(!joblist.containsJob(iOne)) throw STSHException("No job with id of " + to_string(iOne));
-		STSHJob& job = joblist.getJob(iOne);
-		vector<STSHProcess>& processes = job.getProcesses();
-		STSHProcess& process = processes[iTwo];
-		if(!job.containsProcess(process.getID())) throw STSHException("Job " + to_string(iOne) + " doesn't have a pid at index " + to_string(iTwo));
-		kill(process.getID(), SIGCONT);
-	}
-}
-
-static void handle_slay(const pipeline& p) {
-	char* one = p.commands[0].tokens[0];
-	if(one == nullptr) throw STSHException("Usage: slay <jobid> <index> | <pid>.");
-	char* two = p.commands[0].tokens[1];
-	int iOne = atoi(one);
-	if(two == nullptr) { 	// one parameter: only pid
-		if(!joblist.containsProcess(iOne)) throw STSHException("No process with pid " + to_string(iOne));
-		kill(iOne, SIGINT);
-	} else {				// two parameters: job id and pid
-		int iTwo = atoi(two);
-		if(!joblist.containsJob(iOne)) throw STSHException("No job with id of " + to_string(iOne));
-		STSHJob& job = joblist.getJob(iOne);
-		vector<STSHProcess>& processes = job.getProcesses();
-		STSHProcess& process = processes[iTwo];
-		if(!job.containsProcess(process.getID())) throw STSHException("Job " + to_string(iOne) + " doesn't have a pid at index " + to_string(iTwo));
-		kill(process.getID(), SIGINT);
-	}
-}
-
-static void handle_halt(const pipeline& p) {
-	char* one = p.commands[0].tokens[0];
-	if(one == nullptr) throw STSHException("Usage: halt <jobid> <index> | <pid>.");
-	char* two = p.commands[0].tokens[1];
-	int iOne = atoi(one);
-	if(two == nullptr) { 	// one parameter: only pid
-		if(!joblist.containsProcess(iOne)) throw STSHException("No process with pid " + to_string(iOne));
-		kill(iOne, SIGTSTP);
-	} else {				// two parameters: job id and pid
-		int iTwo = atoi(two);
-		if(!joblist.containsJob(iOne)) throw STSHException("No job with id of " + to_string(iOne));
-		STSHJob& job = joblist.getJob(iOne);
-		vector<STSHProcess>& processes = job.getProcesses();
-		STSHProcess& process = processes[iTwo];
-		if(!job.containsProcess(process.getID())) throw STSHException("Job " + to_string(iOne) + " doesn't have a pid at index " + to_string(iTwo));
-		kill(process.getID(), SIGTSTP);
-	}
-}
-
-static void handle_cont(const pipeline& p) {
-	char* one = p.commands[0].tokens[0];
-	if(one == nullptr) throw STSHException("Usage: cont <jobid> <index> | <pid>.");
-	char* two = p.commands[0].tokens[1];
-	int iOne = atoi(one);
-	if(two == nullptr) { 	// one parameter: only pid
-		if(!joblist.containsProcess(iOne)) throw STSHException("No process with pid " + to_string(iOne));
-		kill(iOne, SIGCONT);
-	} else {				// two parameters: job id and pid
-		int iTwo = atoi(two);
-		if(!joblist.containsJob(iOne)) throw STSHException("No job with id of " + to_string(iOne));
-		STSHJob& job = joblist.getJob(iOne);
-		vector<STSHProcess>& processes = job.getProcesses();
-		STSHProcess& process = processes[iTwo];
-		if(!job.containsProcess(process.getID())) throw STSHException("Job " + to_string(iOne) + " doesn't have a pid at index " + to_string(iTwo));
-		kill(process.getID(), SIGCONT);
-	}
-}
 /**
  * Function: handleBuiltin
  * -----------------------
@@ -144,98 +42,75 @@ static void handle_cont(const pipeline& p) {
 static const string kSupportedBuiltins[] = {"quit", "exit", "fg", "bg", "slay", "halt", "cont", "jobs"};
 static const size_t kNumSupportedBuiltins = sizeof(kSupportedBuiltins)/sizeof(kSupportedBuiltins[0]);
 static bool handleBuiltin(const pipeline& pipeline) {
-	const string& command = pipeline.commands[0].command;
-	auto iter = find(kSupportedBuiltins, kSupportedBuiltins + kNumSupportedBuiltins, command);
-	if (iter == kSupportedBuiltins + kNumSupportedBuiltins) return false;
-	size_t index = iter - kSupportedBuiltins;
+  const string& command = pipeline.commands[0].command;
+  auto iter = find(kSupportedBuiltins, kSupportedBuiltins + kNumSupportedBuiltins, command);
+  if (iter == kSupportedBuiltins + kNumSupportedBuiltins) return false;
+  size_t index = iter - kSupportedBuiltins;
 
-	switch (index) {
-		case 0:
-		case 1: exit(0);
-		case 2: 
-				handle_fg(pipeline); break;
-		case 3:
-				handle_bg(pipeline); break;
-		case 4:
-				handle_slay(pipeline); break;
-		case 5:
-				handle_halt(pipeline); break;
-		case 6:
-				handle_cont(pipeline); break;
-		case 7: 
-				cout << joblist; break;
-		default: throw STSHException("Internal Error: Builtin command not supported."); // or not implemented yet
-	}
-
-	return true;
+  switch (index) {
+  case 0:
+  case 1: exit(0);
+  case 2: executeFgCommand(pipeline); break;
+  case 3: executeBgCommand(pipeline); break;
+  case 4: executeSlayCommand(pipeline); break;
+  case 5: executeHaltCommand(pipeline); break;
+  case 6: executeContCommand(pipeline); break;
+  case 7: cout << joblist; break;
+  default: throw STSHException("Internal Error: Builtin command not supported."); // or not implemented yet
+  }
+  
+  return true;
 }
 
+static void handleSigChld(int sig) {
+  /**
+   * This assumes only a single foreground process / job.
+   */
+  int status;
+  pid_t pid = waitpid(-1, &status, WUNTRACED | WCONTINUED);
+  STSHJob& job = joblist.getJobWithProcess(pid);
+  if (WIFSTOPPED(status)) {
+    job.getProcess(pid).setState(kStopped);
+  } else if (WIFCONTINUED(status)) {
+    job.getProcess(pid).setState(kRunning);
+  } else {
+    assert(WIFEXITED(status) || WIFSIGNALED(status));
+    job.getProcess(pid).setState(kTerminated);
+  }
 
-static void sigchld_handler(int sig) {
-	while(true) {
-		int status;
-		// pid_t pid = waitpid(-1, &status, WNOHANG|WUNTRACED);
-		pid_t pid = waitpid(-1, &status, WNOHANG|WUNTRACED|WCONTINUED);
+  bool wasFg = (job.getState() == kForeground);
 
-		if(pid <= 0) break;
+  joblist.synchronize(job);
 
-		if(WIFEXITED(status)) {
-			STSHJob& job = joblist.getJobWithProcess(pid); 
-			assert(job.containsProcess(pid));
-			STSHProcess& process = job.getProcess(pid);
-			process.setState(kTerminated);
-			joblist.synchronize(job);
-		}
-		if(WIFSIGNALED(status)) {
-			STSHJob& job = joblist.getJobWithProcess(pid); 
-			assert(job.containsProcess(pid));
-			STSHProcess& process = job.getProcess(pid);
-			process.setState(kTerminated);
-			joblist.synchronize(job);
-		}	
-		if(WIFSTOPPED(status)) {
-			STSHJob& job = joblist.getJobWithProcess(pid); 
-			assert(job.containsProcess(pid));
-			STSHProcess& process = job.getProcess(pid);
-			process.setState(kStopped);
-			joblist.synchronize(job);
-		}	
-		if(WIFCONTINUED(status)) {
-			STSHJob& job = joblist.getJobWithProcess(pid); 
-			assert(job.containsProcess(pid));
-			STSHProcess& process = job.getProcess(pid);
-			// job.setState(kForeground);	// go crazy! go nuts! why doesn't sync() set this state?!
-			process.setState(kRunning);
-			joblist.synchronize(job);
-		}	
-	}
+  // reattach terminal appropriately
+  if (!wasFg) return;
+  if (WIFCONTINUED(status)) {
+    tcsetpgrp(STDIN_FILENO, job.getGroupID());
+  } else {
+    assert(WIFSTOPPED(status) || WIFSIGNALED(status) || WIFEXITED(status));
+    tcsetpgrp(STDIN_FILENO, getpgrp());
+  }
+
 }
 
-static void sigint_handler(int sig) {
-	if(joblist.hasForegroundJob()) {
-		STSHJob& job = joblist.getForegroundJob();
-		// pid_t pgid = job.getGroupID();
-		// kill(-pgid, SIGINT);
-		vector<STSHProcess>& processes = job.getProcesses();
-		for(unsigned int i = 0; i < processes.size(); i++) {
-			STSHProcess &process = processes[i];
-			kill(process.getID(), SIGINT);
-		}
-	}	
+static void handleSigInt(int sig) {
+  cout << endl;
+  if (joblist.hasForegroundJob()) {
+    STSHJob& fg = joblist.getForegroundJob();
+    kill(-fg.getGroupID(), SIGINT);
+  }
+  siglongjmp(env, 1);
 }
 
-static void sigtstp_handler(int sig) {
-	if(joblist.hasForegroundJob()) {
-		STSHJob& job = joblist.getForegroundJob();
-		// pid_t pgid = job.getGroupID();
-		// kill(-pgid, SIGTSTP);
-		vector<STSHProcess>& processes = job.getProcesses();
-		for(unsigned int i = 0; i < processes.size(); i++) {
-			STSHProcess &process = processes[i];
-			kill(process.getID(), SIGTSTP);
-		}
-	}	
+static void handleSigTstp(int sig) {
+  cout << endl;
+  if (joblist.hasForegroundJob()) {
+    STSHJob& fg = joblist.getForegroundJob();
+    kill(-fg.getGroupID(), SIGTSTP);
+  }
+  siglongjmp(env, 1);
 }
+
 /**
  * Function: installSignalHandlers
  * -------------------------------
@@ -245,19 +120,265 @@ static void sigtstp_handler(int sig) {
  * ignores two others.
  */
 static void installSignalHandlers() {
-	installSignalHandler(SIGQUIT, [](int sig) { exit(0); });
-	installSignalHandler(SIGTTIN, SIG_IGN);
-	installSignalHandler(SIGTTOU, SIG_IGN);
-	installSignalHandler(SIGCHLD, sigchld_handler);
-	installSignalHandler(SIGINT, sigint_handler);
-	installSignalHandler(SIGTSTP, sigtstp_handler);
+  installSignalHandler(SIGQUIT, [](int sig) { exit(0); });
+  installSignalHandler(SIGTTIN, SIG_IGN);
+  installSignalHandler(SIGTTOU, SIG_IGN);
+  installSignalHandler(SIGCHLD, handleSigChld);
+  installSignalHandler(SIGINT, handleSigInt);
+  installSignalHandler(SIGTSTP, handleSigTstp);
 }
 
-static void showPipeline(const pipeline& p) {
-	for(unsigned int i = 0; i < p.commands.size(); i++) {
-		for(unsigned int j = 0; j <= kMaxArguments && p.commands[i].tokens[j] != NULL; j++) {
-		}
-	}
+static void executeFgCommand(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks != 1) {
+    throw STSHException("fg takes one argument.");
+  }
+
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+    // forward SIGCONT to job
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(-job.getGroupID(), SIGCONT);
+    job.setState(kForeground);
+    // print command to terminal
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job number must be an integer.");
+  }
+}
+
+static void executeBgCommand(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks != 1) {
+    throw STSHException("bg takes one argument.");
+  }
+
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+    // forward SIGCONT to job
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(-job.getGroupID(), SIGCONT);
+    job.setState(kBackground);
+    // print command to terminal
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job number must be an integer.");
+  }
+
+}
+
+static void slayProc(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int pid = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (pid <= 0) throw STSHException("Process id must be positive.");
+    // check for valid job in joblist
+    STSHJob& job = joblist.getJobWithProcess(pid);
+    if (job.getNum() == 0) throw STSHException("Process id does not belong to a valid process.");
+    kill(pid, SIGKILL);
+  } catch (invalid_argument& ia) {
+    throw STSHException("Process id must be an integer.");
+  }
+}
+
+static void slayJobIndex(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    int index = stoi(cmd.tokens[1]);
+
+    // check for unsigned int and non-negative index
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    if (index < 0) throw STSHException("Index must be non-negative.");
+
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(job.getProcesses().at(index).getID(), SIGKILL);
+
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job id and index must be integers.");
+  } catch (out_of_range& oor) {
+    throw STSHException("Index is not valid within job id.");
+  }
+}
+
+static void executeSlayCommand(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks < 1) {
+    throw STSHException("bg takes at least one argument.");
+  } else if (numToks > 2) {
+    throw STSHException("bg takes at most two arguments.");
+  }
+
+  if (numToks == 1) {
+    slayProc(pipeline);
+  } else {
+    slayJobIndex(pipeline);
+  }
+}
+
+static void haltProc(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int pid = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (pid <= 0) throw STSHException("Process id must be positive.");
+    // check for valid job in joblist
+    STSHJob& job = joblist.getJobWithProcess(pid);
+    if (job.getNum() == 0) throw STSHException("Process id does not belong to a valid process.");
+    kill(pid, SIGSTOP);
+  } catch (invalid_argument& ia) {
+    throw STSHException("Process id must be an integer.");
+  }
+}
+
+static void haltJobIndex(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    int index = stoi(cmd.tokens[1]);
+
+    // check for unsigned int and non-negative index
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    if (index < 0) throw STSHException("Index must be non-negative.");
+
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(job.getProcesses().at(index).getID(), SIGSTOP);
+
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job id and index must be integers.");
+  } catch (out_of_range& oor) {
+    throw STSHException("Index is not valid within job id.");
+  }
+}
+
+static void executeHaltCommand(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks < 1) {
+    throw STSHException("halt takes at least one argument.");
+  } else if (numToks > 2) {
+    throw STSHException("halt takes at most two arguments.");
+  }
+
+  if (numToks == 1) {
+    haltProc(pipeline);
+  } else {
+    haltJobIndex(pipeline);
+  }
+}
+
+static void contProc(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int pid = stoi(cmd.tokens[0]);
+    // check for unsigned int
+    if (pid <= 0) throw STSHException("Process id must be positive.");
+    // check for valid job in joblist
+    STSHJob& job = joblist.getJobWithProcess(pid);
+    if (job.getNum() == 0) throw STSHException("Process id does not belong to a valid process.");
+    kill(pid, SIGCONT);
+  } catch (invalid_argument& ia) {
+    throw STSHException("Process id must be an integer.");
+  }
+}
+
+static void contJobIndex(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  try {
+    // check for proper integer
+    int jobNum = stoi(cmd.tokens[0]);
+    int index = stoi(cmd.tokens[1]);
+
+    // check for unsigned int and non-negative index
+    if (jobNum <= 0) throw STSHException("Job number must be positive.");
+    if (index < 0) throw STSHException("Index must be non-negative.");
+
+    // check for valid job in joblist
+    if (!joblist.containsJob(jobNum)) throw STSHException("Job is not a valid job number.");
+
+    STSHJob& job = joblist.getJob(jobNum);
+    kill(job.getProcesses().at(index).getID(), SIGCONT);
+
+  } catch (invalid_argument& ia) {
+    throw STSHException("Job id and index must be integers.");
+  } catch (out_of_range& oor) {
+    throw STSHException("Index is not valid within job id.");
+  }
+}
+
+static void executeContCommand(const pipeline& pipeline) {
+  command cmd = pipeline.commands.front();
+  size_t numToks;
+  for (numToks=0; numToks < kMaxArguments; numToks++) {
+    if (cmd.tokens[numToks] == NULL) break;
+  }
+
+  if (numToks < 1) {
+    throw STSHException("cont takes at least one argument.");
+  } else if (numToks > 2) {
+    throw STSHException("cont takes at most two arguments.");
+  }
+
+  if (numToks == 1) {
+    contProc(pipeline);
+  } else {
+    contJobIndex(pipeline);
+  }
+}
+
+// Helper function to construct the argv array for execvp based on the command
+// and tokens. Assumes that argv has sufficient space.
+static void buildArgv(command& cmd, char *argv[]) {
+  argv[0] = cmd.command;
+  for (size_t i=0; i<kMaxArguments; i++) {
+    argv[i+1] = cmd.tokens[i];
+    if (cmd.tokens[i] == NULL) break;
+  }
+}
+
+static void swapFds(int **fd1, int **fd2) {
+  int **temp = fd2;
+  *fd2 = *fd1;
+  *fd1 = *temp;
 }
 
 /**
@@ -266,152 +387,87 @@ static void showPipeline(const pipeline& p) {
  * Creates a new job on behalf of the provided pipeline.
  */
 static void createJob(const pipeline& p) {
-	// showPipeline(p);
-	STSHJob& job = joblist.addJob(kForeground);
-	pid_t pgid = 0;
-	if(p.background) {
-		job.setState(kBackground);
-	}
+  /**
+   * TODO: Block signals while adding to joblist.
+   */
+  pid_t pid;
+  pid_t pgid = 0;
+  assert(!p.commands.empty());
+  STSHJob& job = joblist.addJob((p.background) ? kBackground : kForeground);
 
-	int fds[p.commands.size() - 1][2];
-	for(unsigned int i = 0; i < p.commands.size() - 1; i++) {
-		pipe(fds[i]);
-	}
-	
-	int infd = 0;
-	if(!p.input.empty()) {
-		infd = open(p.input.c_str(), O_RDONLY);
-	}
+  int fds1[2], fds2[2];
+  int *readFds = fds1, *writeFds = fds2;
+  pipe(readFds);
+  pipe(writeFds);
 
-	int outfd = 0;
-	if(!p.output.empty()) {
-		outfd = open(p.output.c_str(), O_WRONLY|O_TRUNC);
-		if(outfd == -1 && errno == ENOENT) {
-			outfd = open(p.output.c_str(), O_WRONLY|O_CREAT, 0644);
-		}
-	}
+  for (size_t i=0; i<p.commands.size(); i++) {
+    auto cmd = p.commands[i];
+    if (i == 0) { // close readFds for first proc
+      close(readFds[1]);
+    }
+    if (i == p.commands.size() - 1) { // close writeFds for last proc
+      close(writeFds[0]);
+    }
 
-	for(unsigned int i = 0; i < p.commands.size(); i++) {
-		pid_t pid = fork();
-		if(pid == 0) {
-			// for fds
-			if(i == 0) {
-				if(!p.input.empty()) {
-					dup2(infd, STDIN_FILENO);
-					close(infd);
-				}
-				close(fds[i][0]);
-				dup2(fds[i][1], STDOUT_FILENO);
-				close(fds[i][1]);
-				for(unsigned int j = 1; j < p.commands.size() - 1; j++) {
-					close(fds[j][0]);
-					close(fds[j][1]);
-				}
-			} else if(i == p.commands.size() - 1) {
-				if(!p.output.empty()) {
-					dup2(outfd, STDOUT_FILENO);
-					close(outfd);
-				}
-				close(fds[i - 1][1]);
-				dup2(fds[i - 1][0], STDIN_FILENO);
-				close(fds[i - 1][0]);
-				for(unsigned int j = 0; j < p.commands.size() - 2; j++) {
-					close(fds[j][0]);
-					close(fds[j][1]);
-				}
-			} else  {
-				close(fds[i - 1][1]);
-				dup2(fds[i - 1][0], STDIN_FILENO);
-				close(fds[i - 1][0]);
-				close(fds[i][0]);
-				dup2(fds[i][1], STDOUT_FILENO);
-				close(fds[i][1]);
-				for(unsigned int j = 0; j < p.commands.size() - 1; j++) {
-					if(j != i - 1 && j != i) {
-						close(fds[j][0]);
-						close(fds[j][1]);
-					}
-				}
-			}
+    if ((pid = fork()) == 0) {
+      setpgid(0, pgid);
 
+      if (pgid) dup2(readFds[0], STDIN_FILENO);
+      else if (!p.input.empty()) {
+        int fd;
+        if ((fd = open(p.input.c_str(), O_RDONLY)) == -1)
+          throw STSHException(string("Failed to open input file: ") + strerror(errno));
+        dup2(fd, STDIN_FILENO);
 
+      }
+      close(readFds[0]);
 
-			char* argv[kMaxArguments + 2] = {NULL};
-			argv[0] = const_cast<char*>(p.commands[i].command);
-			for(unsigned int j = 0; j <= kMaxArguments && p.commands[i].tokens[j] != NULL; j++) {
-				argv[j + 1] = p.commands[i].tokens[j];
-			}
-			if(i == 0) {
-				pgid = getpid();
-				setpgid(getpid(), pid);
-			} else {
-				if(pgid != 0) {
-					setpgid(pid, pgid);
-				}
-			}
-			int err = execvp(argv[0], argv);
-			if(err < 0) throw STSHException("Command not found");
-		} else {
+      if (i != p.commands.size()-1) dup2(writeFds[1], STDOUT_FILENO);
+      else if (!p.output.empty()) {
+        int fd;
+        if ((fd = open(p.output.c_str(), O_WRONLY | O_CREAT | O_TRUNC , 0644)) == -1)
+          throw STSHException(string("Failed to open output file: ") + strerror(errno));
+        dup2(fd, STDOUT_FILENO);
+      }
+      close(writeFds[1]);
 
-			job.addProcess(STSHProcess(pid, p.commands[i]));
-			if(i == 0) {
-				pgid = pid;
-				setpgid(pid, pgid);
+      char *argv[kMaxArguments];
+      buildArgv(cmd, argv);
+      execvp(argv[0], argv);
+      throw STSHException("Command " + string(cmd.command) + " failed: " + strerror(errno));
+    } else {
+      if (pgid == 0) pgid = pid;
+      setpgid(pid, pgid);
 
-			} else {
-				if(pgid != 0) {
-					setpgid(pid, pgid);
-				}
-			}
-		}
-	}
+      STSHProcess proc(pid, cmd);
+      job.addProcess(proc);
 
-	// close fds
-	for(unsigned int i = 0; i < p.commands.size() - 1; i++) {
-		close(fds[i][0]);
-		close(fds[i][1]);
-	}
+      close(readFds[0]);
+      close(writeFds[1]);
+      pipe(readFds);
 
-	sigset_t additions, existingmask;
-	sigemptyset(&additions);
-	sigaddset(&additions, SIGCHLD);
-	sigaddset(&additions, SIGINT);
-	sigaddset(&additions, SIGTSTP);
-	sigaddset(&additions, SIGCONT);
-	sigprocmask(SIG_BLOCK, &additions, &existingmask);
+      if (i != p.commands.size() - 1) {
+        int *temp = readFds;
+        readFds = writeFds;
+        writeFds = temp;
+//      swapFds(&readFds, &writeFds);
+      }
+    }
+  }
 
-	if(p.background) {
-		string str = "";
-		str += "[" + to_string(job.getNum()) + "]";
-		cout << setw(str.size()) << str << " ";
-		vector<STSHProcess>& processes = job.getProcesses();
-		for(unsigned int i = 0; i < processes.size(); i++) {
-			cout << processes[i].getID() << "  ";
-		}
-		cout << endl;
-	}
+  if (p.background) return;
+  if (tcsetpgrp(STDIN_FILENO, pgid) == -1 && errno != ENOTTY)
+    throw STSHException(strerror(errno));
+}
 
-	if(joblist.hasForegroundJob()) {
-		int err = tcsetpgrp(STDIN_FILENO, pgid);
-		if(err == -1) {
-			if(errno != ENOTTY) {
-				throw STSHException("A more serious problem happens.");
-			}
-		}
-	}
-
-	while(joblist.hasForegroundJob()) {
-		sigsuspend(&existingmask);
-	}
-	sigprocmask(SIG_UNBLOCK, &additions, NULL);
-
-	pid_t parent = getpgid(getpid());
-	int err = tcsetpgrp(STDIN_FILENO, parent);
-	if(err == -1) {
-		if(errno != ENOTTY) {
-			throw STSHException("A more serious problem happens.");
-		}
-	}
+static void suspendForForeground() {
+  sigset_t oldMask, extraMask;
+  sigemptyset(&extraMask);
+  sigaddset(&extraMask, SIGCHLD);
+  sigprocmask(SIG_BLOCK, &extraMask, &oldMask);
+  while (joblist.hasForegroundJob())
+    sigsuspend(&oldMask);
+  sigprocmask(SIG_UNBLOCK, &extraMask, NULL);
 }
 
 /**
@@ -422,22 +478,24 @@ static void createJob(const pipeline& p) {
  * loop (i.e. a repl).  
  */
 int main(int argc, char *argv[]) {
-	pid_t stshpid = getpid();
-	installSignalHandlers();
-	rlinit(argc, argv);
-	while (true) {
-		string line;
-		if (!readline(line)) break;
-		if (line.empty()) continue;
-		try {
-			pipeline p(line);
-			bool builtin = handleBuiltin(p);
-			if (!builtin) createJob(p);
-		} catch (const STSHException& e) {
-			cerr << e.what() << endl;
-			if (getpid() != stshpid) exit(0); // if exception is thrown from child process, kill it
-		}
-	}
+  pid_t stshpid = getpid();
+  installSignalHandlers();
+  rlinit(argc, argv);
+  while (true) {
+    string line;
+    sigsetjmp(env, 1);
+    if (!readline(line)) break;
+    if (line.empty()) continue;
+    try {
+      pipeline p(line);
+      bool builtin = handleBuiltin(p);
+      if (!builtin) createJob(p);
+      suspendForForeground();
+    } catch (const STSHException& e) {
+      cerr << e.what() << endl;
+      if (getpid() != stshpid) exit(0); // if exception is thrown from child process, kill it
+    }
+  }
 
-	return 0;
+  return 0;
 }

@@ -27,6 +27,7 @@ void pipeline(char *argv1[], char *argv2[], pid_t pids[]) {
 
     // exec argv2 using fds[0] as stdin
     dup2(fds[0], STDIN_FILENO);
+    close(fds[0]);
     execvp(argv2[0], argv2);
   }
 
@@ -49,6 +50,7 @@ void pipeline(char *argv1[], char *argv2[], pid_t pids[]) {
 
     // exec argv1 using fds[1] as stdout
     dup2(fds[1], STDOUT_FILENO);
+    close(fds[1]);
     execvp(argv1[0], argv1);
   }
 
