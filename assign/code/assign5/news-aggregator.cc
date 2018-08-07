@@ -162,7 +162,9 @@ void NewsAggregator::processAllFeeds() {
 }
 
 void NewsAggregator::processFeeds(const map<string, string>& feeds) {
-  unordered_set<string> seenFeeds, seenArticles;
+  unordered_set<string> seenFeeds, seenArticlesUri;
+  unordered_map<string, unordered_map<string, pair<Article, vector<string>>>> seenServerTitleToArticleTokens;
+
   for (auto it = feeds.cbegin(); it != feeds.cend(); it++) {
     const string& feedUri = it->first, feedTitle = it->second;
     if (seenFeeds.find(feedUri) != seenFeeds.end()) {
@@ -176,29 +178,55 @@ void NewsAggregator::processFeeds(const map<string, string>& feeds) {
       RSSFeed feed(feedUri);
       feed.parse();
       const vector<Article>& articles = feed.getArticles();
-      processArticles(articles, seenArticles);
+      processArticles(articles, seenArticlesUri, seenServerTitleToArticleTokens);
       log.noteSingleFeedDownloadEnd(feedUri);
     } catch (RSSFeedException& rfe) {
       log.noteSingleFeedDownloadFailure(feedUri);
     }
   }
+
+  for (auto it = seenServerTitleToArticleTokens.cbegin(); it != seenServerTitleToArticleTokens.cend(); it++) {
+    for (auto itt = it->second.cbegin(); itt != it->second.cend(); itt++) {
+      index.add(itt->second.first, itt->second.second);
+    }
+  }
 }
 
 void NewsAggregator::processArticles(const vector<Article>& articles,
-                                     unordered_set<string> seenArticles) {
+                                     unordered_set<string>& seenArticlesUri,
+                                     unordered_map<string, unordered_map<string, pair<Article, vector<string>>>>& seenServerTitleToArticleTokens) {
   for (auto& article: articles) {
-    if (seenArticles.find(article.url) != seenArticles.end()) {
+    if (seenArticlesUri.find(article.url) != seenArticlesUri.end()) {
       log.noteSingleArticleDownloadSkipped(article);
       continue;
     }
 
-    seenArticles.insert(article.url);
+    seenArticlesUri.insert(article.url);
+
+    string server = getURLServer(article.url);
+    const auto& serverIt = seenServerTitleToArticleTokens.find(server);
+    bool possibleDupe = ((serverIt != seenServerTitleToArticleTokens.end()) && (serverIt->second.find(article.title) != serverIt->second.end()));
 
     try {
       log.noteSingleArticleDownloadBeginning(article);
       HTMLDocument htmlDoc(article.url);
       htmlDoc.parse();
-      index.add(article, htmlDoc.getTokens());
+      vector<string> tokens = htmlDoc.getTokens();
+      sort(tokens.begin(), tokens.end());
+      vector<string> newTokens;
+      Article newArticle = article;
+
+      if (possibleDupe) {
+        const Article oldArticle = seenServerTitleToArticleTokens[server][article.title].first;
+        const vector<string> oldTokens = seenServerTitleToArticleTokens[server][article.title].second;
+        set_intersection(oldTokens.cbegin(), oldTokens.cend(), tokens.cbegin(), tokens.cend(), back_inserter(newTokens));
+        newArticle = min(oldArticle, article);
+      } else {
+        // TODO: Is this creating a copy?
+        newTokens = tokens;
+      }
+      seenServerTitleToArticleTokens[server][article.title] = {newArticle, newTokens};
+
     } catch (HTMLDocumentException& hde) {
       log.noteSingleArticleDownloadFailure(article);
     }

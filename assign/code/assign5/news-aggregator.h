@@ -9,6 +9,7 @@
 
 #pragma once
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include "log.h"
 #include "rss-index.h"
@@ -83,7 +84,9 @@ class NewsAggregator {
   void processFeeds(const std::map<std::string, std::string>& feeds);
 
   // Helper method for processArticles
-  void processArticles(const std::vector<Article>& articles, std::unordered_set<std::string> seenArticles);
+  void processArticles(const std::vector<Article>& articles,
+                       std::unordered_set<std::string>& seenArticlesUri,
+                       std::unordered_map<std::string, std::unordered_map<std::string, std::pair<Article, std::vector<std::string>>>>& seenServerTitleToArticleTokens);
 
 /**
  * Copy Constructor, Assignment Operator
