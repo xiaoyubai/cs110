@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>Alphabet Feeds</title>
+      <link>http://cs110.stanford.edu/aggregator/articles/b.html</link>
+    </item>
+    <item>
+      <!-- This tests for token intersection for same server and title. -->
+      <!-- It should replace b.html with a.html and thus i only appears 1 time. -->
+      <title>Alphabet Feeds</title>
+      <link>http://cs110.stanford.edu/aggregator/articles/a.html</link>
+    </item>
+    <item>
+      <!-- This tests for same title but different server. -->
+      <!-- It should recognize the article as a separate entity. -->
+      <title>Alphabet Feeds</title>
+      <link>http://web.stanford.edu/class/cs110/aggregator/articles/i.html</link>
+    </item>
+  </channel>
+</rss>
