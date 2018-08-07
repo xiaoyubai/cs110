@@ -7,6 +7,7 @@ CXX = /usr/bin/g++-5
 NA_LIB_SRC = news-aggregator.cc \
 	     log.cc \
 	     utils.cc \
+	     semaphore.cc \
 	     stream-tokenizer.cc \
 	     rss-feed.cc \
 	     rss-feed-list.cc \
