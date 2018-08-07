@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
   g++-5 \
   git \
   libreadline-dev \
+  libxml2 \
   libxml2-dev \
   make \
   man \

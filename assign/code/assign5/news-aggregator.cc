@@ -149,4 +149,58 @@ NewsAggregator::NewsAggregator(const string& rssFeedListURI, bool verbose):
  * outlined in the spec.
  */
 
-void NewsAggregator::processAllFeeds() {}
+void NewsAggregator::processAllFeeds() {
+  try {
+    RSSFeedList feeder(rssFeedListURI);
+    feeder.parse();
+    const auto& feeds = feeder.getFeeds();
+    processFeeds(feeds);
+    log.noteFullRSSFeedListDownloadEnd();
+  } catch (RSSFeedListException& rfle) {
+    log.noteFullRSSFeedListDownloadFailureAndExit(rssFeedListURI);
+  }
+}
+
+void NewsAggregator::processFeeds(const map<string, string>& feeds) {
+  unordered_set<string> seenFeeds, seenArticles;
+  for (auto it = feeds.cbegin(); it != feeds.cend(); it++) {
+    const string& feedUri = it->first, feedTitle = it->second;
+    if (seenFeeds.find(feedUri) != seenFeeds.end()) {
+      log.noteSingleFeedDownloadSkipped(feedUri);
+      continue;
+    }
+
+    seenFeeds.insert(feedUri);
+    try {
+      log.noteSingleFeedDownloadBeginning(feedUri);
+      RSSFeed feed(feedUri);
+      feed.parse();
+      const vector<Article>& articles = feed.getArticles();
+      processArticles(articles, seenArticles);
+      log.noteSingleFeedDownloadEnd(feedUri);
+    } catch (RSSFeedException& rfe) {
+      log.noteSingleFeedDownloadFailure(feedUri);
+    }
+  }
+}
+
+void NewsAggregator::processArticles(const vector<Article>& articles,
+                                     unordered_set<string> seenArticles) {
+  for (auto& article: articles) {
+    if (seenArticles.find(article.url) != seenArticles.end()) {
+      log.noteSingleArticleDownloadSkipped(article);
+      continue;
+    }
+
+    seenArticles.insert(article.url);
+
+    try {
+      log.noteSingleArticleDownloadBeginning(article);
+      HTMLDocument htmlDoc(article.url);
+      htmlDoc.parse();
+      index.add(article, htmlDoc.getTokens());
+    } catch (HTMLDocumentException& hde) {
+      log.noteSingleArticleDownloadFailure(article);
+    }
+  }
+}

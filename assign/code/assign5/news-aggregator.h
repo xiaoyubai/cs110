@@ -9,6 +9,7 @@
 
 #pragma once
 #include <string>
+#include <unordered_set>
 #include "log.h"
 #include "rss-index.h"
 
@@ -76,6 +77,13 @@ class NewsAggregator {
  * You need to implement this function.
  */
   void processAllFeeds();
+
+
+  // Helper method for processAllFeeds
+  void processFeeds(const std::map<std::string, std::string>& feeds);
+
+  // Helper method for processArticles
+  void processArticles(const std::vector<Article>& articles, std::unordered_set<std::string> seenArticles);
 
 /**
  * Copy Constructor, Assignment Operator
