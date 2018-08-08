@@ -11,6 +11,7 @@
 #include <string>
 #include <map>
 #include <set>
+#include "semaphore.h"
 #include "log.h"
 #include "rss-index.h"
 
@@ -68,7 +69,15 @@ class NewsAggregator {
   std::map<std::string, std::map<std::string, std::pair<Article, std::vector<std::string>>>> seenServerTitleToArticleTokens;
 
   // indexing multi-threading primatives
-  // placeholder.
+  semaphore feedSem = {5};
+  std::mutex feedUriLock;
+
+  std::map<std::string, std::unique_ptr<semaphore>> serverSem;
+  std::mutex serverSemLock;
+  std::mutex serverLock;
+
+  semaphore articleSem = {18};
+  std::mutex articleUriLock;
   
 /**
  * Constructor: NewsAggregator

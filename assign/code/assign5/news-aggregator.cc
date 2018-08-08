@@ -11,7 +11,7 @@
 #include <libxml/parser.h>
 #include <libxml/catalog.h>
 // you will almost certainly need to add more system header includes
-
+#include <thread>
 // I'm not giving away too much detail here by leaking the #includes below,
 // which contribute to the official CS110 staff solution.
 #include "rss-feed.h"
@@ -162,25 +162,37 @@ void NewsAggregator::processAllFeeds() {
 }
 
 void NewsAggregator::processFeeds(const map<string, string>& feeds) {
-  for (auto it = feeds.cbegin(); it != feeds.cend(); it++) {
-    const string& feedUri = it->first, feedTitle = it->second;
-    if (seenFeedsUri.find(feedUri) != seenFeedsUri.end()) {
-      log.noteSingleFeedDownloadSkipped(feedUri);
-      continue;
-    }
+  vector<thread> threads;
 
-    seenFeedsUri.insert(feedUri);
-    try {
-      log.noteSingleFeedDownloadBeginning(feedUri);
-      RSSFeed feed(feedUri);
-      feed.parse();
-      const vector<Article>& articles = feed.getArticles();
-      processArticles(articles);
-      log.noteSingleFeedDownloadEnd(feedUri);
-    } catch (RSSFeedException& rfe) {
-      log.noteSingleFeedDownloadFailure(feedUri);
-    }
+  for (auto it = feeds.cbegin(); it != feeds.cend(); it++) {
+    feedSem.wait();
+    threads.push_back(thread([this](semaphore& s, mutex& feedUriLock, pair<string, string> feedPair){
+//      s.signal(on_thread_exit);
+      const string& feedUri = feedPair.first, feedTitle = feedPair.second;
+
+      feedUriLock.lock();
+      if (seenFeedsUri.find(feedUri) != seenFeedsUri.end()) {
+        feedUriLock.unlock();
+        log.noteSingleFeedDownloadSkipped(feedUri);
+        return;
+      }
+      seenFeedsUri.insert(feedUri);
+      feedUriLock.unlock();
+
+      try {
+        log.noteSingleFeedDownloadBeginning(feedUri);
+        RSSFeed feed(feedUri);
+        feed.parse();
+        processArticles(feed.getArticles());
+        log.noteSingleFeedDownloadEnd(feedUri);
+      } catch (RSSFeedException& rfe) {
+        log.noteSingleFeedDownloadFailure(feedUri);
+      }
+      feedSem.signal();
+    }, ref(feedSem), ref(feedUriLock), *it));
   }
+
+  for (thread& t: threads) t.join();
 
   for (auto it = seenServerTitleToArticleTokens.cbegin(); it != seenServerTitleToArticleTokens.cend(); it++) {
     for (auto itt = it->second.cbegin(); itt != it->second.cend(); itt++) {
@@ -190,41 +202,69 @@ void NewsAggregator::processFeeds(const map<string, string>& feeds) {
 }
 
 void NewsAggregator::processArticles(const vector<Article>& articles) {
+  vector<thread> threads;
+
   for (auto& article: articles) {
-    if (seenArticlesUri.find(article.url) != seenArticlesUri.end()) {
-      log.noteSingleArticleDownloadSkipped(article);
-      continue;
-    }
+    articleSem.wait();
+    threads.push_back(thread([this](semaphore& articleSem, mutex& serverLock, Article article){
+//      articleSem.signal(on_thread_exit);
 
-    seenArticlesUri.insert(article.url);
-
-    string server = getURLServer(article.url);
-    const auto& serverIt = seenServerTitleToArticleTokens.find(server);
-    bool possibleDupe = ((serverIt != seenServerTitleToArticleTokens.end())
-                         && (serverIt->second.find(article.title) != serverIt->second.end()));
-
-    try {
-      log.noteSingleArticleDownloadBeginning(article);
-      HTMLDocument htmlDoc(article.url);
-      htmlDoc.parse();
-      vector<string> tokens = htmlDoc.getTokens();
-      sort(tokens.begin(), tokens.end());
-      vector<string> newTokens;
-      Article newArticle = article;
-
-      if (possibleDupe) {
-        const Article oldArticle = seenServerTitleToArticleTokens[server][article.title].first;
-        const vector<string> oldTokens = seenServerTitleToArticleTokens[server][article.title].second;
-        set_intersection(oldTokens.cbegin(), oldTokens.cend(), tokens.cbegin(), tokens.cend(), back_inserter(newTokens));
-        newArticle = min(oldArticle, article);
-      } else {
-        // TODO: Is this creating a copy?
-        newTokens = tokens;
+      articleUriLock.lock();
+      if (seenArticlesUri.find(article.url) != seenArticlesUri.end()) {
+        articleUriLock.unlock();
+        log.noteSingleArticleDownloadSkipped(article);
+        return;
       }
-      seenServerTitleToArticleTokens[server][article.title] = {newArticle, newTokens};
+      seenArticlesUri.insert(article.url);
+      articleUriLock.unlock();
 
-    } catch (HTMLDocumentException& hde) {
-      log.noteSingleArticleDownloadFailure(article);
-    }
+      string server = getURLServer(article.url);
+      serverLock.lock();
+      const auto& serverIt = seenServerTitleToArticleTokens.find(server);
+      bool possibleDupe = ((serverIt != seenServerTitleToArticleTokens.end())
+                           && (serverIt->second.find(article.title) != serverIt->second.end()));
+      serverLock.unlock();
+
+      try {
+        log.noteSingleArticleDownloadBeginning(article);
+
+        serverSemLock.lock();
+        unique_ptr<semaphore>& myServerSem = serverSem[server];
+        if (myServerSem == nullptr) myServerSem.reset(new semaphore);
+        serverSemLock.unlock();
+
+        myServerSem->wait();
+//        myServerSem->signal(on_thread_exit);
+
+        HTMLDocument htmlDoc(article.url);
+        htmlDoc.parse();
+        myServerSem->signal();
+
+        vector<string> tokens = htmlDoc.getTokens();
+        sort(tokens.begin(), tokens.end());
+        vector<string> newTokens;
+        Article newArticle = article;
+
+        serverLock.lock();
+        if (possibleDupe) {
+          const Article oldArticle = seenServerTitleToArticleTokens[server][article.title].first;
+          const vector<string> oldTokens = seenServerTitleToArticleTokens[server][article.title].second;
+          set_intersection(oldTokens.cbegin(), oldTokens.cend(), tokens.cbegin(), tokens.cend(), back_inserter(newTokens));
+          newArticle = min(oldArticle, article);
+        } else {
+          // TODO: Is this creating a copy?
+          newTokens = tokens;
+        }
+        seenServerTitleToArticleTokens[server][article.title] = {newArticle, newTokens};
+        serverLock.unlock();
+      } catch (HTMLDocumentException& hde) {
+        log.noteSingleArticleDownloadFailure(article);
+      }
+
+      articleSem.signal();
+
+    }, ref(articleSem), ref(serverLock), article));
   }
+
+  for (thread& t: threads) t.join();
 }
