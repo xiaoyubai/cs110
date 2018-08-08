@@ -24,6 +24,7 @@ class NewsAggregatorLog {
   void noteAllRSSFeedsDownloadEnd() const;
   
   void noteSingleArticleDownloadBeginning(const Article& article) const;
+  void noteSingleArticleDownloadFinished(const Article& article) const;
   void noteSingleArticleDownloadSkipped(const Article& article) const;
   void noteSingleArticleDownloadFailure(const Article& article) const;
   void noteAllArticlesHaveBeenScheduled(const std::string& feedTitle) const;

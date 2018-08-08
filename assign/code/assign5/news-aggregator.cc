@@ -180,8 +180,8 @@ void NewsAggregator::processFeeds(const map<string, string>& feeds) {
       feedUriLock.unlock();
 
       try {
-        log.noteSingleFeedDownloadBeginning(feedUri);
         RSSFeed feed(feedUri);
+        log.noteSingleFeedDownloadBeginning(feedUri);
         feed.parse();
         processArticles(feed.getArticles());
         log.noteSingleFeedDownloadEnd(feedUri);
@@ -225,8 +225,6 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
       serverLock.unlock();
 
       try {
-        log.noteSingleArticleDownloadBeginning(article);
-
         serverSemLock.lock();
         unique_ptr<semaphore>& myServerSem = serverSem[server];
         if (myServerSem == nullptr) myServerSem.reset(new semaphore(8));
@@ -234,7 +232,9 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
 
         myServerSem->wait();
         HTMLDocument htmlDoc(article.url);
+        log.noteSingleArticleDownloadBeginning(article);
         htmlDoc.parse();
+        log.noteSingleArticleDownloadFinished(article);
         myServerSem->signal();
 
         vector<string> tokens = htmlDoc.getTokens();
