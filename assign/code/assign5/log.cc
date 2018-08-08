@@ -66,6 +66,16 @@ void NewsAggregatorLog::noteSingleArticleDownloadBeginning(const Article& articl
   cout << osunlock;
 }
 
+void NewsAggregatorLog::noteSingleArticleDownloadFinished(const Article& article) const {
+  if (!verbose) return;
+  string title = shouldTruncate(article.title) ? truncate(article.title) : article.title;
+  string url = shouldTruncate(article.url) ? truncate(article.url) : article.url;
+  cout << oslock;
+  cout << "  Finished \"" << title << "\"" << endl;
+  cout << "      [at \"" << url << "\"]" << endl;
+  cout << osunlock;
+}
+
 void NewsAggregatorLog::noteSingleArticleDownloadSkipped(const Article& article) const {
   if (!verbose) return;
   string title = shouldTruncate(article.title) ? truncate(article.title) : article.title;

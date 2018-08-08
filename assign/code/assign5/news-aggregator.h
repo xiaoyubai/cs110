@@ -9,12 +9,11 @@
 
 #pragma once
 #include <string>
+#include <map>
+#include <set>
+#include "semaphore.h"
 #include "log.h"
 #include "rss-index.h"
-#include <unordered_set>
-#include <mutex>
-
-using namespace std;
 
 class NewsAggregator {
   
@@ -65,13 +64,20 @@ class NewsAggregator {
   RSSIndex index;
   bool built;
 
-  const static int childMaxNum = 5;
-  const static int grandchildMaxNum = 8;
-  const static int grandchildLimit = 18;
+  // indexing data structures
+  std::set<std::string> seenFeedsUri, seenArticlesUri;
+  std::map<std::string, std::map<std::string, std::pair<Article, std::vector<std::string>>>> seenServerTitleToArticleTokens;
 
-  static std::mutex indexLock;
-  static std::mutex urlSetLock;
-  static std::unordered_set<std::string> urlSet;
+  // indexing multi-threading primatives
+  semaphore feedSem = {5};
+  std::mutex feedUriLock;
+
+  std::map<std::string, std::unique_ptr<semaphore>> serverSem;
+  std::mutex serverSemLock;
+  std::mutex serverLock;
+
+  semaphore articleSem = {18};
+  std::mutex articleUriLock;
   
 /**
  * Constructor: NewsAggregator
@@ -88,8 +94,14 @@ class NewsAggregator {
  * You need to implement this function.
  */
   void processAllFeeds();
-  void feed2articles(std::map<std::string, std::string> feeds);
-  void article2tokens(std::vector<Article>);
+
+
+  // Helper method for processAllFeeds
+  void processFeeds(const std::map<std::string, std::string>& feeds);
+
+  // Helper method for processArticles
+  void processArticles(const std::vector<Article>& articles);
+
 /**
  * Copy Constructor, Assignment Operator
  * -------------------------------------
