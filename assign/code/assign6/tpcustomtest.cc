@@ -35,7 +35,6 @@ static void singleThreadSingleWaitTest() {
     cout << "This is a test." << endl;
     sleep_for(1000);
   });
-  pool.wait();
 }
 
 static void noThreadsDoubleWaitTest() {
@@ -48,7 +47,7 @@ static void reuseThreadPoolTest() {
   ThreadPool pool(4);
   for (size_t i = 0; i < 16; i++) {
     pool.schedule([] {
-      cout << oslock << "This is a test." << endl << osunlock;
+      cout << "This is a test." << endl;
       sleep_for(50);
     });
   }

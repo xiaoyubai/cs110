@@ -10,8 +10,6 @@
 #include <string>
 #include "log.h"
 #include "rss-index.h"
-#include <unordered_set>
-#include <mutex>
 
 class NewsAggregator {
   
@@ -61,14 +59,7 @@ class NewsAggregator {
   std::string rssFeedListURI;
   RSSIndex index;
   bool built;
-
-  const static int childNum = 3;
-  const static int grandchildNum = 20;
-
-  static std::mutex indexLock;
-  static std::mutex urlSetLock;
-  static std::unordered_set<std::string> urlSet;
-
+  
 /**
  * Constructor: NewsAggregator
  * ---------------------------
@@ -85,16 +76,6 @@ class NewsAggregator {
  * of an unbounded number of threads.
  */
   void processAllFeeds();
- 
-/**
- * heler function for processAllFeeds()
- */
-  void feed2articles(std::map<std::string, std::string> feeds);
-
-/**
- * helper function for feed2articles()
- */
-  void article2tokens(std::vector<Article>);
 
 /**
  * Copy Constructor, Assignment Operator
