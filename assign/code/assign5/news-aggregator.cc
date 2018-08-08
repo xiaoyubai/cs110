@@ -162,23 +162,20 @@ void NewsAggregator::processAllFeeds() {
 }
 
 void NewsAggregator::processFeeds(const map<string, string>& feeds) {
-  unordered_set<string> seenFeeds, seenArticlesUri;
-  unordered_map<string, unordered_map<string, pair<Article, vector<string>>>> seenServerTitleToArticleTokens;
-
   for (auto it = feeds.cbegin(); it != feeds.cend(); it++) {
     const string& feedUri = it->first, feedTitle = it->second;
-    if (seenFeeds.find(feedUri) != seenFeeds.end()) {
+    if (seenFeedsUri.find(feedUri) != seenFeedsUri.end()) {
       log.noteSingleFeedDownloadSkipped(feedUri);
       continue;
     }
 
-    seenFeeds.insert(feedUri);
+    seenFeedsUri.insert(feedUri);
     try {
       log.noteSingleFeedDownloadBeginning(feedUri);
       RSSFeed feed(feedUri);
       feed.parse();
       const vector<Article>& articles = feed.getArticles();
-      processArticles(articles, seenArticlesUri, seenServerTitleToArticleTokens);
+      processArticles(articles);
       log.noteSingleFeedDownloadEnd(feedUri);
     } catch (RSSFeedException& rfe) {
       log.noteSingleFeedDownloadFailure(feedUri);
@@ -192,9 +189,7 @@ void NewsAggregator::processFeeds(const map<string, string>& feeds) {
   }
 }
 
-void NewsAggregator::processArticles(const vector<Article>& articles,
-                                     unordered_set<string>& seenArticlesUri,
-                                     unordered_map<string, unordered_map<string, pair<Article, vector<string>>>>& seenServerTitleToArticleTokens) {
+void NewsAggregator::processArticles(const vector<Article>& articles) {
   for (auto& article: articles) {
     if (seenArticlesUri.find(article.url) != seenArticlesUri.end()) {
       log.noteSingleArticleDownloadSkipped(article);
@@ -205,7 +200,8 @@ void NewsAggregator::processArticles(const vector<Article>& articles,
 
     string server = getURLServer(article.url);
     const auto& serverIt = seenServerTitleToArticleTokens.find(server);
-    bool possibleDupe = ((serverIt != seenServerTitleToArticleTokens.end()) && (serverIt->second.find(article.title) != serverIt->second.end()));
+    bool possibleDupe = ((serverIt != seenServerTitleToArticleTokens.end())
+                         && (serverIt->second.find(article.title) != serverIt->second.end()));
 
     try {
       log.noteSingleArticleDownloadBeginning(article);

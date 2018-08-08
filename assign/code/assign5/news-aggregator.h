@@ -9,8 +9,8 @@
 
 #pragma once
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
+#include <map>
+#include <set>
 #include "log.h"
 #include "rss-index.h"
 
@@ -62,6 +62,13 @@ class NewsAggregator {
   std::string rssFeedListURI;
   RSSIndex index;
   bool built;
+
+  // indexing data structures
+  std::set<std::string> seenFeedsUri, seenArticlesUri;
+  std::map<std::string, std::map<std::string, std::pair<Article, std::vector<std::string>>>> seenServerTitleToArticleTokens;
+
+  // indexing multi-threading primatives
+  // placeholder.
   
 /**
  * Constructor: NewsAggregator
@@ -84,9 +91,7 @@ class NewsAggregator {
   void processFeeds(const std::map<std::string, std::string>& feeds);
 
   // Helper method for processArticles
-  void processArticles(const std::vector<Article>& articles,
-                       std::unordered_set<std::string>& seenArticlesUri,
-                       std::unordered_map<std::string, std::unordered_map<std::string, std::pair<Article, std::vector<std::string>>>>& seenServerTitleToArticleTokens);
+  void processArticles(const std::vector<Article>& articles);
 
 /**
  * Copy Constructor, Assignment Operator
