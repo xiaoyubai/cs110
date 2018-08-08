@@ -167,7 +167,7 @@ void NewsAggregator::processFeeds(const map<string, string>& feeds) {
   for (auto it = feeds.cbegin(); it != feeds.cend(); it++) {
     feedSem.wait();
     threads.push_back(thread([this](semaphore& s, mutex& feedUriLock, pair<string, string> feedPair){
-//      s.signal(on_thread_exit);
+      s.signal(on_thread_exit);
       const string& feedUri = feedPair.first, feedTitle = feedPair.second;
 
       feedUriLock.lock();
@@ -188,7 +188,6 @@ void NewsAggregator::processFeeds(const map<string, string>& feeds) {
       } catch (RSSFeedException& rfe) {
         log.noteSingleFeedDownloadFailure(feedUri);
       }
-      feedSem.signal();
     }, ref(feedSem), ref(feedUriLock), *it));
   }
 
@@ -207,7 +206,7 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
   for (auto& article: articles) {
     articleSem.wait();
     threads.push_back(thread([this](semaphore& articleSem, mutex& serverLock, Article article){
-//      articleSem.signal(on_thread_exit);
+      articleSem.signal(on_thread_exit);
 
       articleUriLock.lock();
       if (seenArticlesUri.find(article.url) != seenArticlesUri.end()) {
@@ -230,12 +229,10 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
 
         serverSemLock.lock();
         unique_ptr<semaphore>& myServerSem = serverSem[server];
-        if (myServerSem == nullptr) myServerSem.reset(new semaphore);
+        if (myServerSem == nullptr) myServerSem.reset(new semaphore(8));
         serverSemLock.unlock();
 
         myServerSem->wait();
-//        myServerSem->signal(on_thread_exit);
-
         HTMLDocument htmlDoc(article.url);
         htmlDoc.parse();
         myServerSem->signal();
@@ -260,8 +257,6 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
       } catch (HTMLDocumentException& hde) {
         log.noteSingleArticleDownloadFailure(article);
       }
-
-      articleSem.signal();
 
     }, ref(articleSem), ref(serverLock), article));
   }

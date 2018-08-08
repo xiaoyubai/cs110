@@ -13,19 +13,16 @@ void semaphore::wait() {
   lock_guard<mutex> lg(m);
   if (value == 0) cv.wait(m, [this] { return value > 0; }); // guard against spurious wakeup
   value--;
-  cout << oslock << "entering" << endl << osunlock;
 }
 
 void semaphore::signal() {
   lock_guard<mutex> lg(m);
   value++;
   if (value == 1) cv.notify_all(); // cv.notify_one();
-  cout << oslock << "leaving" << endl << osunlock;
 }
 
-//void semaphore::signal(signal_condition) {
-//  boost::this_thread::at_thread_exit([this] {
-//      this->signal();
-//      cout << oslock << "leaving" << endl << osunlock;
-//  });
-//}
+void semaphore::signal(signal_condition) {
+  boost::this_thread::at_thread_exit([this] {
+      this->signal();
+  });
+}
