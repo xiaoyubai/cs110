@@ -218,12 +218,6 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
       articleUriLock.unlock();
 
       string server = getURLServer(article.url);
-      serverLock.lock();
-      const auto& serverIt = seenServerTitleToArticleTokens.find(server);
-      bool possibleDupe = ((serverIt != seenServerTitleToArticleTokens.end())
-                           && (serverIt->second.find(article.title) != serverIt->second.end()));
-      serverLock.unlock();
-
       try {
         serverSemLock.lock();
         unique_ptr<semaphore>& myServerSem = serverSem[server];
@@ -234,7 +228,7 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
         HTMLDocument htmlDoc(article.url);
         log.noteSingleArticleDownloadBeginning(article);
         htmlDoc.parse();
-        log.noteSingleArticleDownloadFinished(article);
+//        log.noteSingleArticleDownloadFinished(article);
         myServerSem->signal();
 
         vector<string> tokens = htmlDoc.getTokens();
@@ -243,6 +237,10 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
         Article newArticle = article;
 
         serverLock.lock();
+        const auto& serverIt = seenServerTitleToArticleTokens.find(server);
+        bool possibleDupe = ((serverIt != seenServerTitleToArticleTokens.end())
+                             && (serverIt->second.find(article.title) != serverIt->second.end()));
+
         if (possibleDupe) {
           const Article oldArticle = seenServerTitleToArticleTokens[server][article.title].first;
           const vector<string> oldTokens = seenServerTitleToArticleTokens[server][article.title].second;
@@ -257,6 +255,7 @@ void NewsAggregator::processArticles(const vector<Article>& articles) {
       } catch (HTMLDocumentException& hde) {
         log.noteSingleArticleDownloadFailure(article);
       }
+
 
     }, ref(articleSem), ref(serverLock), article));
   }
