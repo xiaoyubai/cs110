@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
   gcc \
   g++-5 \
   git \
+  libboost-all-dev \
   libreadline-dev \
   libxml2 \
   libxml2-dev \
