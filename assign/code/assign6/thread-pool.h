@@ -10,10 +10,16 @@
 #ifndef _thread_pool_
 #define _thread_pool_
 
+#include <condition_variable>
 #include <cstddef>     // for size_t
 #include <functional>  // for the function template used in the schedule signature
+#include <mutex>
 #include <thread>      // for thread
 #include <vector>      // for vector
+#include <queue>
+#include "semaphore.h"
+
+typedef std::function<void(void)> Thunk;
 
 class ThreadPool {
  public:
@@ -30,7 +36,7 @@ class ThreadPool {
  * to be executed by one of the ThreadPool's threads as soon as
  * all previously scheduled thunks have been handled.
  */
-  void schedule(const std::function<void(void)>& thunk);
+  void schedule(const Thunk& thunk);
 
 /**
  * Blocks and waits until all previously scheduled thunks
@@ -48,6 +54,22 @@ class ThreadPool {
  private:
   std::thread dt;                // dispatcher thread handle
   std::vector<std::thread> wts;  // worker thread handles
+
+  std::mutex jm;
+  std::condition_variable_any jcv;
+  std::queue<Thunk> jq;          // jobs queue
+
+  std::mutex tm;
+  std::condition_variable_any tcv;
+  std::queue<std::size_t> tq;    // thread queue
+
+  std::vector<std::pair<std::unique_ptr<semaphore>, Thunk>> thq;  // thunk handles
+
+  std::mutex sm;
+  bool allScheduled = false;
+
+  void dispatcher();
+  void worker(int workerID);
 
 /**
  * ThreadPools are the type of thing that shouldn't be cloneable, since it's
