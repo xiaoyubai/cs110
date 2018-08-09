@@ -42,7 +42,7 @@ void ThreadPool::dispatcher() {
     sm.unlock();
 
     jm.lock();
-    Thunk& t = jq.front();
+    Thunk t = jq.front();
     jq.pop();
     jcv.notify_all();
     jm.unlock();
