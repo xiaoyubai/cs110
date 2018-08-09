@@ -84,6 +84,23 @@ static void waitAfterThreadsFinishTest() {
   pool.wait();
 }
 
+static void multipleThreadPoolsTest() {
+  ThreadPool pool1(5), pool2(5);
+  // pool 1 and pool 2 shouldn't interfere with each other
+  for (size_t i=0; i<10; i++) {
+    pool1.schedule([i]{
+        this_thread::sleep_for(std::chrono::milliseconds(200));
+        cout << oslock << "Pool 1, Thread " << i << " done." << endl << osunlock;
+    });
+    pool2.schedule([i]{
+        this_thread::sleep_for(std::chrono::milliseconds(200));
+        cout << oslock << "Pool 2, Thread " << i << " done." << endl << osunlock;
+    });
+  }
+  pool1.wait();
+  pool2.wait();
+}
+
 struct testEntry {
   string flag;
   function<void(void)> testfn;
@@ -96,7 +113,8 @@ static void buildMap(map<string, function<void(void)>>& testFunctionMap) {
     {"--no-threads-double-wait", noThreadsDoubleWaitTest},
     {"--reuse-thread-pool", reuseThreadPoolTest},
     {"--pool-limit-and-order", poolLimitAndOrderTest},
-    {"--wait-after-threads-finish", waitAfterThreadsFinishTest}
+    {"--wait-after-threads-finish", waitAfterThreadsFinishTest},
+    {"--multiple-pools", multipleThreadPoolsTest}
   };
 
   for (const testEntry& entry: entries) {
