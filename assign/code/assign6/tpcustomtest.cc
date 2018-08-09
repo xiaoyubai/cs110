@@ -21,6 +21,8 @@
 #include "ostreamlock.h"
 using namespace std;
 
+static void buildMap(map<string, function<void(void)>>& testFunctionMap);
+
 static void singleThreadNoWaitTest() {
   ThreadPool pool(4);
   pool.schedule([] {
@@ -126,6 +128,35 @@ struct testEntry {
   function<void(void)> testfn;
 };
 
+static void captureTest() {
+  map<string, Thunk> testMap;
+  buildMap(testMap);
+
+  // first verify that a regular thread works
+  vector<thread> threads;
+  for (const auto& entry: testMap) {
+    const string name = entry.first;
+    cout << oslock << "in main: " << name << endl << osunlock;
+    threads.push_back(thread([name]{
+      this_thread::sleep_for(std::chrono::milliseconds(100));
+      cout << oslock << "in thread: " << name << endl << osunlock;
+    }));
+  }
+
+  for (thread& t: threads) t.join();
+
+  ThreadPool pool(3);
+  for (const auto& entry: testMap) {
+    const string name = entry.first;
+    cout << oslock << "in main: " << name << endl << osunlock;
+    pool.schedule([name]{
+      this_thread::sleep_for(std::chrono::milliseconds(100));
+      cout << oslock << "in thread pool: " << name << endl << osunlock;
+    });
+  }
+  pool.wait();
+}
+
 static void buildMap(map<string, function<void(void)>>& testFunctionMap) {
   testEntry entries[] = {
     {"--single-thread-no-wait", singleThreadNoWaitTest},
@@ -135,7 +166,8 @@ static void buildMap(map<string, function<void(void)>>& testFunctionMap) {
     {"--pool-limit-and-order", poolLimitAndOrderTest},
     {"--wait-after-threads-finish", waitAfterThreadsFinishTest},
     {"--multiple-pools", multipleThreadPoolsTest},
-    {"--nested-pools", nestedThreadPoolsTest}
+    {"--nested-pools", nestedThreadPoolsTest},
+    {"--capture-test", captureTest}
   };
 
   for (const testEntry& entry: entries) {
