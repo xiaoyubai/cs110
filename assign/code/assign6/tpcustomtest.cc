@@ -60,6 +60,17 @@ static void reuseThreadPoolTest() {
   pool.wait();
 }
 
+static void poolLimitAndOrderTest() {
+  ThreadPool pool(2);
+  for (size_t i = 0; i < 20; i++) {
+    pool.schedule([i]{
+        this_thread::sleep_for(std::chrono::milliseconds(100 * (i/2)));
+      cout << "Thread " << i << " of Group " << (i / 2) << endl;
+    });
+  }
+  pool.wait();
+}
+
 struct testEntry {
   string flag;
   function<void(void)> testfn;
@@ -71,6 +82,7 @@ static void buildMap(map<string, function<void(void)>>& testFunctionMap) {
     {"--single-thread-single-wait", singleThreadSingleWaitTest},
     {"--no-threads-double-wait", noThreadsDoubleWaitTest},
     {"--reuse-thread-pool", reuseThreadPoolTest},
+    {"--pool-limit-and-order", poolLimitAndOrderTest}
   };
 
   for (const testEntry& entry: entries) {
