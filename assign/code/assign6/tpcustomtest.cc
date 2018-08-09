@@ -128,7 +128,7 @@ struct testEntry {
   function<void(void)> testfn;
 };
 
-static void captureTest() {
+static void captureStringTest() {
   map<string, Thunk> testMap;
   buildMap(testMap);
 
@@ -157,6 +157,32 @@ static void captureTest() {
   pool.wait();
 }
 
+static void captureIntTest() {
+  // first verify that a regular thread works
+  vector<thread> threads;
+  for (size_t i=0; i<5; i++) {
+    const size_t name = i;
+    cout << oslock << "in main: " << name << endl << osunlock;
+    threads.push_back(thread([name]{
+      this_thread::sleep_for(std::chrono::milliseconds(100));
+      cout << oslock << "in thread: " << name << endl << osunlock;
+    }));
+  }
+
+  for (thread& t: threads) t.join();
+
+  ThreadPool pool(3);
+  for (size_t i=0; i<5; i++) {
+    const size_t name = i;
+    cout << oslock << "in main: " << name << endl << osunlock;
+    pool.schedule([name]{
+      this_thread::sleep_for(std::chrono::milliseconds(100));
+      cout << oslock << "in thread pool: " << name << endl << osunlock;
+    });
+  }
+  pool.wait();
+}
+
 static void buildMap(map<string, function<void(void)>>& testFunctionMap) {
   testEntry entries[] = {
     {"--single-thread-no-wait", singleThreadNoWaitTest},
@@ -167,7 +193,8 @@ static void buildMap(map<string, function<void(void)>>& testFunctionMap) {
     {"--wait-after-threads-finish", waitAfterThreadsFinishTest},
     {"--multiple-pools", multipleThreadPoolsTest},
     {"--nested-pools", nestedThreadPoolsTest},
-    {"--capture-test", captureTest}
+    {"--capture-test-int", captureIntTest},
+    {"--capture-test-str", captureStringTest}
   };
 
   for (const testEntry& entry: entries) {
