@@ -66,7 +66,7 @@ class ThreadPool {
   std::vector<std::pair<std::unique_ptr<semaphore>, Thunk>> thq;  // thunk handles
 
   std::mutex sm;
-  bool allScheduled = false;
+  bool shouldContinue = false;
 
   void dispatcher();
   void worker(int workerID);
