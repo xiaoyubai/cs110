@@ -78,8 +78,9 @@ void ThreadPool::worker(int workerID) {
 }
 
 void ThreadPool::schedule(const Thunk& thunk) {
-  lock_guard<mutex> lg(jm);
+  jm.lock();
   jq.push(thunk);
+  jm.unlock();
   jcv.notify_all();
 }
 
