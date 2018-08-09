@@ -30,11 +30,11 @@ void ThreadPool::dispatcher() {
   while (true) {
     // Consider if I should replace m + cv with sems
     jm.lock();
-    jcv.wait(jm, [this]{ return shouldContinue || !jq.empty(); });
+    jcv.wait(jm, [this]{ return shouldTerminate || !jq.empty(); });
     jm.unlock();
 
     sm.lock();
-    if (shouldContinue) {
+    if (shouldTerminate) {
       sm.unlock();
       for (auto& thqp: thq) thqp.first->signal();
       break;
@@ -63,7 +63,7 @@ void ThreadPool::worker(int workerID) {
     thq[workerID].first->wait();
 
     sm.lock();
-    if (shouldContinue) {
+    if (shouldTerminate) {
       sm.unlock();
       break;
     }
@@ -95,7 +95,7 @@ void ThreadPool::wait() {
 
 ThreadPool::~ThreadPool() {
   sm.lock();
-  shouldContinue = true;
+  shouldTerminate = true;
   jcv.notify_all();
   sm.unlock();
 

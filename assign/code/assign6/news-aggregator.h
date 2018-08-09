@@ -1,19 +1,23 @@
 /**
  * File: news-aggregator.h
  * -----------------------
- * Defines the NewsAggregator class.  As opposed to your Assignment 5
- * version, this one relies on the services of two ThreadPools to
- * limit and *recycle* a small number of threads.
+ * Defines the NewsAggregator class.  While it is smart enough to limit the number of threads that
+ * can exist at any one time, it does not try to conserve threads by pooling or reusing them.
+ * Assignment 6 will revisit this same exact program, where you'll reimplement the NewsAggregator
+ * class to reuse threads instead of spawning new ones for every download.
  */
 
 #pragma once
 #include <string>
+#include <map>
+#include <set>
+#include "thread-pool.h"
 #include "log.h"
 #include "rss-index.h"
 
 class NewsAggregator {
-  
- public:
+
+public:
 /**
  * Factory Method: createNewsAggregator
  * ------------------------------------
@@ -40,8 +44,8 @@ class NewsAggregator {
  * query the index to list articles.
  */
   void queryIndex() const;
-  
- private:
+
+private:
 /**
  * Private Types: url, server, title
  * ---------------------------------
@@ -54,12 +58,23 @@ class NewsAggregator {
   typedef std::string url;
   typedef std::string server;
   typedef std::string title;
-  
+
   NewsAggregatorLog log;
   std::string rssFeedListURI;
   RSSIndex index;
   bool built;
-  
+
+  // indexing data structures
+  std::set<std::string> seenFeedsUri, seenArticlesUri;
+  std::map<std::string, std::map<std::string, std::pair<Article, std::vector<std::string>>>> seenServerTitleToArticleTokens;
+
+  // indexing multi-threading primatives
+  ThreadPool feedPool = {3};
+  ThreadPool articlePool = {20};
+  std::mutex feedUriLock;
+  std::mutex serverLock;
+  std::mutex articleUriLock;
+
 /**
  * Constructor: NewsAggregator
  * ---------------------------
@@ -71,11 +86,17 @@ class NewsAggregator {
 /**
  * Method: processAllFeeds
  * -----------------------
- * Downloads all of the feeds and news articles to build the index.
- * You need to implement this function using two ThreadPools instead
- * of an unbounded number of threads.
+ * Spawns the recursive tree of threads needed to download all articles.
+ * You need to implement this function.
  */
   void processAllFeeds();
+
+
+  // Helper method for processAllFeeds
+  void processFeeds(const std::map<std::string, std::string>& feeds);
+
+  // Helper method for processArticles
+  void processArticles(const std::vector<Article>& articles);
 
 /**
  * Copy Constructor, Assignment Operator
