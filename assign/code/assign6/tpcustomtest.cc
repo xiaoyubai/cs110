@@ -27,7 +27,6 @@ static void singleThreadNoWaitTest() {
     cout << "This is a test." << endl;
   });
   this_thread::sleep_for(std::chrono::milliseconds(1000));
-//  sleep_for(); // emulate wait without actually calling wait (that's a different test)
 }
 
 static void singleThreadSingleWaitTest() {
@@ -35,7 +34,6 @@ static void singleThreadSingleWaitTest() {
   pool.schedule([] {
     cout << "This is a test." << endl;
     this_thread::sleep_for(std::chrono::milliseconds(1000));
-//    sleep_for(1000);
   });
 }
 
@@ -51,15 +49,13 @@ static void reuseThreadPoolTest() {
     pool.schedule([] {
       cout << "This is a test." << endl;
         this_thread::sleep_for(std::chrono::milliseconds(50));
-//        sleep_for(50);
     });
   }
   pool.wait();
   pool.schedule([] {
     cout << "This is a code." << endl;
     this_thread::sleep_for(std::chrono::milliseconds(1000));
-//      sleep_for(1000);
-  }); 
+  });
   pool.wait();
 }
 
