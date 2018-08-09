@@ -35,6 +35,7 @@ static void singleThreadSingleWaitTest() {
     cout << "This is a test." << endl;
     this_thread::sleep_for(std::chrono::milliseconds(1000));
   });
+  pool.wait();
 }
 
 static void noThreadsDoubleWaitTest() {
