@@ -20,7 +20,9 @@ ThreadPool::ThreadPool(size_t numThreads) : wts(numThreads), thq(numThreads) {
     wts[workerID] = thread([this](size_t workerID){
       worker(workerID);
     }, workerID);
+    tm.lock();
     tq.push(workerID);
+    tm.unlock();
   }
 }
 
@@ -54,8 +56,6 @@ void ThreadPool::dispatcher() {
     thq[workerID].second = t;
     thq[workerID].first->signal();
   }
-
-  cout << oslock << "dispatcher done" << endl << osunlock;
 }
 
 void ThreadPool::worker(int workerID) {
@@ -75,8 +75,6 @@ void ThreadPool::worker(int workerID) {
     tcv.notify_all();
     tm.unlock();
   }
-
-  cout << oslock << "worker " << workerID << " done." << endl << osunlock;
 }
 
 void ThreadPool::schedule(const Thunk& thunk) {
@@ -92,7 +90,6 @@ void ThreadPool::wait() {
   tm.lock();
   tcv.wait(tm, [this]{ return tq.size() == wts.size(); });
   tm.unlock();
-  cout << "Done!" << endl;
 }
 
 ThreadPool::~ThreadPool() {
@@ -102,13 +99,6 @@ ThreadPool::~ThreadPool() {
   sm.unlock();
 
   dt.join();
-  for (thread& t: wts) {
-    cout << oslock << "joining" << endl << osunlock;
-    t.join();
-    cout << oslock << "joined" << endl << osunlock;
-  }
-
-//  for (auto& thqp : thq) {
-//    thqp.first.release();
-//  }
+  for (thread& t: wts) t.join();
+  for (auto& thqp : thq) thqp.first.release();
 }
