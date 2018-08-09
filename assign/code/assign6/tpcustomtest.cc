@@ -24,7 +24,7 @@ using namespace std;
 static void singleThreadNoWaitTest() {
   ThreadPool pool(4);
   pool.schedule([] {
-    cout << "This is a test." << endl;
+    cout << oslock << "This is a test." << endl << osunlock;
   });
   this_thread::sleep_for(std::chrono::milliseconds(1000));
 }
@@ -32,7 +32,7 @@ static void singleThreadNoWaitTest() {
 static void singleThreadSingleWaitTest() {
   ThreadPool pool(4);
   pool.schedule([] {
-    cout << "This is a test." << endl;
+    cout << oslock << "This is a test." << endl << osunlock;
     this_thread::sleep_for(std::chrono::milliseconds(1000));
   });
   pool.wait();
@@ -48,13 +48,13 @@ static void reuseThreadPoolTest() {
   ThreadPool pool(4);
   for (size_t i = 0; i < 16; i++) {
     pool.schedule([] {
-      cout << "This is a test." << endl;
-        this_thread::sleep_for(std::chrono::milliseconds(50));
+      cout << oslock << "This is a test." << endl << osunlock;
+      this_thread::sleep_for(std::chrono::milliseconds(50));
     });
   }
   pool.wait();
   pool.schedule([] {
-    cout << "This is a code." << endl;
+    cout << oslock << "This is a code." << endl << osunlock;
     this_thread::sleep_for(std::chrono::milliseconds(1000));
   });
   pool.wait();
@@ -64,10 +64,23 @@ static void poolLimitAndOrderTest() {
   ThreadPool pool(2);
   for (size_t i = 0; i < 20; i++) {
     pool.schedule([i]{
-        this_thread::sleep_for(std::chrono::milliseconds(100 * (i/2)));
-      cout << "Thread " << i << " of Group " << (i / 2) << endl;
+      this_thread::sleep_for(std::chrono::milliseconds(100 * (i/2)));
+      cout << oslock << "Thread " << i << " of Group " << (i / 2) << endl << osunlock;
     });
   }
+  pool.wait();
+}
+
+static void waitAfterThreadsFinishTest() {
+  ThreadPool pool(4);
+  for (size_t i=0; i <4; i++) {
+    pool.schedule([i]{
+      this_thread::sleep_for(std::chrono::milliseconds(100));
+      cout << oslock << "Thread " << i << " done." << endl << osunlock;
+    });
+  }
+  this_thread::sleep_for(std::chrono::milliseconds(200));
+  cout << oslock << "Waiting now." << endl << osunlock;
   pool.wait();
 }
 
@@ -82,7 +95,8 @@ static void buildMap(map<string, function<void(void)>>& testFunctionMap) {
     {"--single-thread-single-wait", singleThreadSingleWaitTest},
     {"--no-threads-double-wait", noThreadsDoubleWaitTest},
     {"--reuse-thread-pool", reuseThreadPoolTest},
-    {"--pool-limit-and-order", poolLimitAndOrderTest}
+    {"--pool-limit-and-order", poolLimitAndOrderTest},
+    {"--wait-after-threads-finish", waitAfterThreadsFinishTest}
   };
 
   for (const testEntry& entry: entries) {
