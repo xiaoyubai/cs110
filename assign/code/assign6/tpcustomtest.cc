@@ -73,7 +73,7 @@ static void poolLimitAndOrderTest() {
 
 static void waitAfterThreadsFinishTest() {
   ThreadPool pool(4);
-  for (size_t i=0; i <4; i++) {
+  for (size_t i = 0; i < 4; i++) {
     pool.schedule([i]{
       this_thread::sleep_for(std::chrono::milliseconds(100));
       cout << oslock << "Thread " << i << " done." << endl << osunlock;
@@ -87,7 +87,7 @@ static void waitAfterThreadsFinishTest() {
 static void multipleThreadPoolsTest() {
   ThreadPool pool1(5), pool2(5);
   // pool 1 and pool 2 shouldn't interfere with each other
-  for (size_t i=0; i<10; i++) {
+  for (size_t i = 0; i < 10; i++) {
     pool1.schedule([i]{
         this_thread::sleep_for(std::chrono::milliseconds(200));
         cout << oslock << "Pool 1, Thread " << i << " done." << endl << osunlock;
@@ -99,6 +99,26 @@ static void multipleThreadPoolsTest() {
   }
   pool1.wait();
   pool2.wait();
+}
+
+static void nestedThreadPoolsTest() {
+  ThreadPool outerPool(2);
+  for (size_t i = 0; i < 3; i++) {
+    outerPool.schedule([i]{
+        cout << oslock << "Starting in pool " << i << endl << osunlock;
+        ThreadPool innerPool(3);
+        for (size_t j = 0; j < 5; j++) {
+          this_thread::sleep_for(std::chrono::milliseconds(100));
+          cout << oslock << "Scheduling pool " << i << ", j = " << j << endl << osunlock;
+          innerPool.schedule([i, j]{
+              this_thread::sleep_for(std::chrono::milliseconds(200));
+              cout << oslock << "Finished pool " << i << ", j = " << j << endl << osunlock;
+          });
+        }
+        innerPool.wait();
+    });
+  }
+  outerPool.wait();
 }
 
 struct testEntry {
@@ -114,7 +134,8 @@ static void buildMap(map<string, function<void(void)>>& testFunctionMap) {
     {"--reuse-thread-pool", reuseThreadPoolTest},
     {"--pool-limit-and-order", poolLimitAndOrderTest},
     {"--wait-after-threads-finish", waitAfterThreadsFinishTest},
-    {"--multiple-pools", multipleThreadPoolsTest}
+    {"--multiple-pools", multipleThreadPoolsTest},
+    {"--nested-pools", nestedThreadPoolsTest}
   };
 
   for (const testEntry& entry: entries) {
