@@ -10,6 +10,28 @@ void testStartsWith() {
 
   char const * test = "abc";
   assert(startsWith(test, "ab"));
+  cout << "[testStartsWith] :: \t PASSED" << endl;
+}
+
+void testToLowerCase() {
+  assert(toLowerCase("") == "");
+  assert(toLowerCase("a") == "a");
+  assert(toLowerCase("A") == "a");
+  assert(toLowerCase("abc123") == "abc123");
+  assert(toLowerCase("ABC123") == "abc123");
+  assert(toLowerCase("UPPER_CASE") == "upper_case");
+  cout << "[testToLowerCase] ::  \t PASSED" << endl;
+}
+
+void testRtrim() {
+  assert(rtrim("abc") == "abc");
+  assert(rtrim(" abc") == " abc");
+  assert(rtrim("abc ") == "abc");
+  assert(rtrim(" abc ") == " abc");
+  assert(rtrim("  abc   ") == "  abc");
+  assert(rtrim("  ") == "");
+  assert(rtrim("   a  b c  ") == "   a  b c");
+  cout << "[testRtrim] ::  \t PASSED" << endl;
 }
 
 void testTrim() {
@@ -20,6 +42,7 @@ void testTrim() {
   assert(trim("  abc   ") == "abc");
   assert(trim("  ") == "");
   assert(trim("   a  b c  ") == "a  b c");
+  cout << "[testTrim] ::  \t\t PASSED" << endl;
 }
 
 void testJoin() {
@@ -28,10 +51,13 @@ void testJoin() {
   assert(join({"abc"}, "-") == "abc");
   assert(join({"abc", "abc"}, "-") == "abc-abc");
   assert(join({"abc", "abc"}, "---") == "abc---abc");
+  cout << "[testJoin] ::  \t\t PASSED" << endl;
 }
 
 int main(int argc, char *argv[]) {
   testStartsWith();
+  testToLowerCase();
+  testRtrim();
   testTrim();
   testJoin();
 }
