@@ -16,9 +16,6 @@
 #include "header.h"
 #include "payload.h"
 #include "proxy-exception.h"
-#include "ostreamlock.h"
-#include "response.h"
-#include <socket++/sockstream.h> // for sockbuf, iosockstream
 
 class HTTPRequest {
 
@@ -30,7 +27,6 @@ class HTTPRequest {
   friend std::ostream& operator<<(std::ostream& os, const HTTPRequest& rh);
   
  public:
-  std::string recover_request(); 
 
 /**
  * Ingests, parses, and stores the first line of the HTTP request.
@@ -94,8 +90,6 @@ class HTTPRequest {
  * pairs.
  */
   bool containsName(const std::string& name) const;
-  void addEntity(const std::string& clientIPAddress);
-  bool containsLoop(const std::pair<int, std::string>& connection); 
   
  private:
   std::string requestLine;

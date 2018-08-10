@@ -13,19 +13,13 @@
 
 class HTTPProxyScheduler {
  public:
-  HTTPProxyScheduler();
   void setProxy(const std::string& server, unsigned short port);
   void clearCache() { requestHandler.clearCache(); }
   void setCacheMaxAge(long maxAge) { requestHandler.setCacheMaxAge(maxAge); }
   void scheduleRequest(int clientfd, const std::string& clientIPAddr) throw ();
-  std::string getProxyServer();
-  unsigned short getProxyPortNumber(); 
   
  private:
   HTTPRequestHandler requestHandler;
-  bool isUsingProxy;
-  std::string proxyServer;
-  unsigned short proxyPortNumber;
 };
 
 #endif

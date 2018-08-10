@@ -9,20 +9,20 @@ import sys, os, pty, select, signal
 from collections import namedtuple
 
 DIR = os.path.normpath(os.path.realpath(__file__) + "/../")
-CMD = "./proxy -p 1653"
+CMD = "./proxy"
 HOST_FMT = "myth%d.stanford.edu"
 
-#  def comment_me_out_once_you_understand():
-#      print "Open up this python script and update the HOSTS variable with"
-#      print "the number (and just the number) of the myth machine where you'd"
-#      print "like to run your proxy (e.g. HOSTS = [22])."
-#      print
-#      print "Once you have proxy chaining working, you can extend the HOSTS list"
-#      print "to be a comma-delimited list of myth machine numbers."
-#      sys.exit(0)
+def comment_me_out_once_you_understand():
+    print "Open up this python script and update the HOSTS variable with"
+    print "the number (and just the number) of the myth machine where you'd"
+    print "like to run your proxy (e.g. HOSTS = [22])."
+    print
+    print "Once you have proxy chaining working, you can extend the HOSTS list"
+    print "to be a comma-delimited list of myth machine numbers."
+    sys.exit(0)
 
-#  comment_me_out_once_you_understand()
-HOSTS = [9, 10]
+comment_me_out_once_you_understand()
+HOSTS = [xx]
 
 Child = namedtuple("Child", ["name", "pid", "fd"])
 children = []

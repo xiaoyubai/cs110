@@ -31,8 +31,6 @@ class HTTPCache {
   bool shouldCache(const HTTPRequest& request, const HTTPResponse& response) const;
   void cacheEntry(const HTTPRequest& request, const HTTPResponse& response);
 
-  size_t getHashCode(const HTTPRequest& request) const;
-
 /**
  * Clears the cache of all entries.
  */
