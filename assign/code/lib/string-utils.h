@@ -24,6 +24,22 @@ static bool startsWith(const string& a, const string& b) {
   return true;
 }
 
+static string toLowerCase(const string& s) {
+  string res;
+  for (char c: s) res += tolower(c);
+  return res;
+}
+
+static string rtrim(const string& s) {
+  size_t end;
+  for (end=s.length()-1; end>=0; end--) {
+    if (s[end] != ' ') break;
+  }
+  size_t len = end+1;
+  string res = s.substr(0, len);
+  return res;
+}
+
 static const string trim(const string& s) {
   size_t start, end, len;
   for (start=0; start<s.length(); start++) {
