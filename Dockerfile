@@ -6,9 +6,11 @@ COPY ./assign/code/lib/ /usr/include/
 
 # install essential system progs
 RUN apt-get update && apt-get install -y \
+  automake \
   bison \
   flex \
   gcc \
+  g++ \
   g++-5 \
   git \
   libboost-all-dev \
@@ -23,6 +25,7 @@ RUN apt-get update && apt-get install -y \
 # create cs110 folder
 CMD mkdir /cs110
 
-# set cs110 as working dir
-WORKDIR /cs110
+# install socket++ lib
+WORKDIR /usr/include/socketxx
+RUN ./autogen && ./configure --prefix=/usr && (make || true) && su && ((make install) || true)
 
