@@ -10,6 +10,7 @@
 #include "response.h"
 #include <sstream>
 #include <socket++/sockstream.h> // for sockbuf, iosockstream
+#include <unordered_set>
 #include "ostreamlock.h"
 using namespace std;
 
@@ -47,14 +48,16 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   if (isUsingProxy && header.containsName("x-forwarded-for")) {
     string token;
     istringstream ss(header.getValueAsString("x-forwarded-for"));
+    unordered_set<string> seen;
     while (getline(ss, token, ',')) {
-      if (token == proxyServer) {
+      if (seen.find(token) != seen.end()) {
         response.setResponseCode(504);
         response.setProtocol("HTTP/1.0");
         response.setPayload("Proxy chain cycle found");
         css << response << flush;
         return;
       }
+      seen.insert(token);
     }
   }
 

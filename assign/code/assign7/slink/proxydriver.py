@@ -79,7 +79,7 @@ class ProxyTest(object):
         curl.setopt(pycurl.WRITEFUNCTION, body.write)
         try:
             curl.perform()
-        except pycurl.error, error:
+        except pycurl.error as error:
             result = RequestFailure(error[1])
             curl.close()
             return result

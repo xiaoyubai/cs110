@@ -14,12 +14,15 @@ RUN apt-get update && apt-get install -y \
   g++-5 \
   git \
   libboost-all-dev \
+  libcurl4-openssl-dev \
   libreadline-dev \
+  libssl-dev \
   libxml2 \
   libxml2-dev \
   make \
   man \
   python \
+  python-pip \
   vim
 
 # create cs110 folder
