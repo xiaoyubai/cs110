@@ -40,7 +40,7 @@ class HTTPRequest {
  *   GET http://www.facebook.com/jerry HTTP/1.1
  *   POST http://graph.facebook.com/like?url=www.nytimes.com HTTP/1.1
  */
-  void ingestRequestLine(std::istream& instream) throw (HTTPBadRequestException);
+  void ingestRequestLine(std::istream& instream, bool isUsingProxy) throw (HTTPBadRequestException);
 
 /**
  * Ingests everything beyond the first line up to the first
@@ -72,8 +72,6 @@ class HTTPRequest {
  * data.
  */
   void ingestPayload(std::istream& instream);
-
-  void fixRequestServerField();
 
 /**
  * The next six methods are all const, inlined accessors.

@@ -28,9 +28,8 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   sockbuf csb(connection.first);
   iosockstream css(&csb);
   HTTPRequest request;
-  request.ingestRequestLine(css);
+  request.ingestRequestLine(css, isUsingProxy);
   request.ingestHeader(css, connection.second);
-  request.fixRequestServerField();
   request.ingestPayload(css);
 
   // check if blacklisted
@@ -60,8 +59,6 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   }
 
   // modify request by client
-  bool isFromProxy = header.containsName("x-forwarded-for");
-  cout << ((isFromProxy) ? "IS FROM PROXY!!" : "not proxy") << endl;
   header.addHeader("x-forwarded-proto", "http");
   string forwardedForStr;
   if (header.containsName("x-forwarded-for"))
@@ -81,28 +78,10 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   }
 
   // send modified request to host
-  string originHostServer = request.getServer();
-  if (isFromProxy) {
-    if (!header.containsName("host")) {
-      response.setResponseCode(400);
-      response.setProtocol("HTTP/1.0");
-      response.setPayload("Bad Request");
-      css << response << flush;
-      return;
-    }
-//    originHostServer = header.getValueAsString("host");
-  }
-
-//  if (isUsingProxy) {
-//    request.
-//  }
-
-  const std::string& hostServer = (isUsingProxy) ? proxyServer : originHostServer;
+  const std::string& hostServer = (isUsingProxy) ? proxyServer : request.getServer();
   unsigned short hostPort = (isUsingProxy) ? proxyPort : request.getPort();
-  cout << "hostServer: " << hostServer << ", hostPort: " << hostPort << endl;
   int hs = createClientSocket(hostServer, hostPort);
   if (hs == kClientSocketError) {
-//    cout << "can't create socket to origin" << endl;
     response.setResponseCode(400);
     response.setProtocol("HTTP/1.0");
     response.setPayload("Bad Request");
@@ -118,7 +97,6 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   response.ingestPayload(hss);
 
   // write response to client
-  cout << oslock << request << endl <<  response.getResponseCode() << osunlock<< endl;
   css << response << flush;
 
   // cache if necessary
