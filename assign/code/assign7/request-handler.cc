@@ -20,6 +20,16 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   request.ingestHeader(css, connection.second);
   request.ingestPayload(css);
 
+  // check if blacklisted
+  HTTPResponse response;
+  if (!blacklist.serverIsAllowed(request.getServer())) {
+    response.setResponseCode(403);
+    response.setProtocol("HTTP/1.0");
+    response.setPayload("Forbidden Content");
+    css << response << flush;
+    return;
+  }
+
   // modify request by client
   HTTPHeader& header = request.getHeader();
   header.addHeader("x-forwarded-proto", "http");
@@ -29,24 +39,36 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   forwardedForStr += connection.second;
   header.addHeader("x-forwarded-for", forwardedForStr);
 
+  // check if cached only after modifying
+  // (because i will cache the modified request)
+  if (cache.containsCacheEntry(request, response)) {
+    css << response << flush;
+    return;
+  }
+
   // send modified request to host
   int hs = createClientSocket(request.getServer(), request.getPort());
   sockbuf hsb(hs);
   iosockstream hss(&hsb);
   hss << request << flush;
-//  cout << request.getURL() << endl;
 
   // receive response from host
-  HTTPResponse response;
   response.ingestResponseHeader(hss);
   response.ingestPayload(hss);
-//  cout << response.getResponseCode() << endl;
 
   // write response to client
   css << response << flush;
+
+  // cache if necessary
+  if (cache.shouldCache(request, response)) cache.cacheEntry(request, response);
 }
 
 // the following two methods needs to be completed 
 // once you incorporate your HTTPCache into your HTTPRequestHandler
-void HTTPRequestHandler::clearCache() {}
-void HTTPRequestHandler::setCacheMaxAge(long maxAge) {}
+void HTTPRequestHandler::clearCache() {
+  cache.clear();
+}
+
+void HTTPRequestHandler::setCacheMaxAge(long maxAge) {
+  cache.setMaxAge(maxAge);
+}
