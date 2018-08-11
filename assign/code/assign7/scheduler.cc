@@ -9,5 +9,7 @@
 using namespace std;
 
 void HTTPProxyScheduler::scheduleRequest(int clientfd, const string& clientIPAddress) throw () {
-  requestHandler.serviceRequest(make_pair(clientfd, clientIPAddress));
+  pool.schedule([this, clientfd, clientIPAddress]{
+    requestHandler.serviceRequest(make_pair(clientfd, clientIPAddress));
+  });
 }

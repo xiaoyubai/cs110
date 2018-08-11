@@ -11,6 +11,10 @@
 #include <socket++/sockstream.h> // for sockbuf, iosockstream
 using namespace std;
 
+size_t HTTPRequestHandler::getMutexHash(const HTTPRequest& request) {
+  return cache.hashRequest(request) % cache.numMutex;
+}
+
 void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) throw() {
   // parse request from client
   sockbuf csb(connection.first);
@@ -38,6 +42,10 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
     forwardedForStr += header.getValueAsString("x-forwarded-for") + ",";
   forwardedForStr += connection.second;
   header.addHeader("x-forwarded-for", forwardedForStr);
+
+  // attempt to acquire mutex for this request
+  size_t hash = getMutexHash(request);
+  lock_guard<mutex> lg(cache.ms[hash]);
 
   // check if cached only after modifying
   // (because i will cache the modified request)

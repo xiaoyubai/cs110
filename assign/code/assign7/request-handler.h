@@ -15,10 +15,8 @@
 
 class HTTPRequestHandler {
  public:
-  HTTPRequestHandler(){
-    blacklist.addToBlacklist(blacklistFile);
-  };
-
+  HTTPRequestHandler(){ blacklist.addToBlacklist(blacklistFile); };
+  size_t getMutexHash(const HTTPRequest& request);
   void serviceRequest(const std::pair<int, std::string>& connection) throw();
   void clearCache();
   void setCacheMaxAge(long maxAge);

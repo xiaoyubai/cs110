@@ -11,6 +11,7 @@
 #include <string>
 #include <mutex>
 #include <sys/time.h>
+#include <vector>
 #include "request.h"
 #include "response.h"
 
@@ -43,10 +44,13 @@ class HTTPCache {
  * a cacheable item is allowed to remain in the cache from the time it was placed there.
  */
   void setMaxAge(long maxAge) { this->maxAge = maxAge; }
-  
- private:
-  std::string getCacheDirectory() const;
+
   size_t hashRequest(const HTTPRequest& request) const;
+  std::vector<std::mutex> ms;
+  const static size_t numMutex = 997;
+
+private:
+  std::string getCacheDirectory() const;
   std::string hashRequestAsString(const HTTPRequest& request) const;
   std::string serializeRequest(const HTTPRequest& request) const;
   bool cacheEntryExists(const std::string& filename) const;
