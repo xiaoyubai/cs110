@@ -84,6 +84,8 @@ class HTTPRequest {
   const std::string& getPath() const { return path; }
   const std::string& getProtocol() const { return protocol; }
 
+  HTTPHeader& getHeader() { return requestHeader; }
+
 /**
  * Returns true if and only if the supplied, case-insensitive
  * name exists within the collection of (zero or more) name-value
