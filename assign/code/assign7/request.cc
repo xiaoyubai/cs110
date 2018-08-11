@@ -24,7 +24,8 @@ void HTTPRequest::ingestRequestLine(istream& instream) throw (HTTPBadRequestExce
   iss >> method >> url >> protocol;
   server = url;
   size_t pos = server.find(kProtocolPrefix);
-  server.erase(0, kProtocolPrefix.size());
+  if (pos != string::npos) //{
+    server.erase(0, kProtocolPrefix.size());
   pos = server.find('/');
   if (pos == string::npos) {
     // url came in as something like http://www.google.com, without the trailing /
@@ -35,6 +36,10 @@ void HTTPRequest::ingestRequestLine(istream& instream) throw (HTTPBadRequestExce
     path = server.substr(pos);
     server.erase(pos);
   }
+//  } else {
+//    path = url;
+//  }
+//  cout << url << ", " << server << ", " << path << endl;
   port = kDefaultPort;
   pos = server.find(':');
   if (pos == string::npos) return;
@@ -44,6 +49,12 @@ void HTTPRequest::ingestRequestLine(istream& instream) throw (HTTPBadRequestExce
 
 void HTTPRequest::ingestHeader(istream& instream, const string& clientIPAddress) {
   requestHeader.ingestHeader(instream);
+}
+
+void HTTPRequest::fixRequestServerField() {
+  if (server.find(kProtocolPrefix) != string::npos) return;
+  if (!requestHeader.containsName("host")) return;
+  server = requestHeader.getValueAsString("host");
 }
 
 bool HTTPRequest::containsName(const string& name) const {

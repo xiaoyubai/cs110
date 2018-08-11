@@ -20,10 +20,15 @@ class HTTPRequestHandler {
   void serviceRequest(const std::pair<int, std::string>& connection) throw();
   void clearCache();
   void setCacheMaxAge(long maxAge);
+  void setProxy(const std::string server, unsigned short port);
+
  private:
   const std::string blacklistFile = "blocked-domains.txt";
   HTTPBlacklist blacklist;
   HTTPCache cache;
+  bool isUsingProxy = false;
+  std::string proxyServer;
+  unsigned short proxyPort;
 };
 
 #endif

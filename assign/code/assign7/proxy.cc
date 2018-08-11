@@ -41,6 +41,7 @@ HTTPProxy::HTTPProxy(int argc, char *argv[]) throw (HTTPProxyException) :
     configureFromArgumentList(argc, argv);
     createServerSocket();
     configureServerSocket();
+    if (usingProxy) scheduler.setProxy(getProxyServer(), getProxyPortNumber());
   } catch (const HTTPProxyException& hpe) {
     if (listenfd != kUnitializedSocket) {
       close(listenfd);

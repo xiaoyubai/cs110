@@ -73,6 +73,8 @@ class HTTPRequest {
  */
   void ingestPayload(std::istream& instream);
 
+  void fixRequestServerField();
+
 /**
  * The next six methods are all const, inlined accessors.
  * Their behaviors should all be obvious.
@@ -83,7 +85,6 @@ class HTTPRequest {
   unsigned short getPort() const { return port; }
   const std::string& getPath() const { return path; }
   const std::string& getProtocol() const { return protocol; }
-
   HTTPHeader& getHeader() { return requestHeader; }
 
 /**

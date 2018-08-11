@@ -10,7 +10,7 @@ from collections import namedtuple
 
 DIR = os.path.normpath(os.path.realpath(__file__) + "/../")
 CMD = "./proxy"
-HOST_FMT = "myth%d.stanford.edu"
+# HOST_FMT = "myth%d.stanford.edu"
 
 def comment_me_out_once_you_understand():
     print "Open up this python script and update the HOSTS variable with"
@@ -21,24 +21,25 @@ def comment_me_out_once_you_understand():
     print "to be a comma-delimited list of myth machine numbers."
     sys.exit(0)
 
-comment_me_out_once_you_understand()
-HOSTS = [xx]
+# comment_me_out_once_you_understand()
+HOSTS = [51630, 51631, 51632, 51633]
 
 Child = namedtuple("Child", ["name", "pid", "fd"])
 children = []
 for i in range(len(HOSTS)):
     hostnum = HOSTS[i]
-    hostname = HOST_FMT % hostnum
+    hostname = "172.17.0.2" # HOST_FMT % hostnum
     # We need ssh to allocate a terminal, and we want each process to have its own.
     pid, fd = pty.fork()
     if pid == 0: 
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-        command = "./proxy"
+        command = "./proxy --port %s" % HOSTS[i]
         if i < len(HOSTS) - 1:
-            secondaryproxynum = HOSTS[i + 1]
-            secondaryproxy = HOST_FMT % secondaryproxynum
-            command += " --proxy-server %s" % secondaryproxy
-        args = ["/bin/bash", "-c", "ssh -t %s \"cd %s && %s\"" % (hostname, DIR, command)]
+            secondaryproxyport = HOSTS[i + 1]
+            secondaryproxy = "172.17.0.2"
+            command += (" --proxy-server %s" % secondaryproxy) + (" --proxy-port %s" % secondaryproxyport)
+        args = ["/bin/bash", "-c", "%s" % command]
+        # args = ["/bin/bash", "-c", "ssh -t %s \"cd %s && %s\"" % (hostname, DIR, command)]
         os.execv(args[0], args)
     else:
         nicename = hostname.split(".")[0] if "." in hostname else hostname

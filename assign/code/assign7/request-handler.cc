@@ -8,11 +8,19 @@
 #include "request.h"
 #include "request-handler.h"
 #include "response.h"
+#include <sstream>
 #include <socket++/sockstream.h> // for sockbuf, iosockstream
+#include "ostreamlock.h"
 using namespace std;
 
 size_t HTTPRequestHandler::getMutexHash(const HTTPRequest& request) {
   return cache.hashRequest(request) % cache.numMutex;
+}
+
+void HTTPRequestHandler::setProxy(const std::string server, unsigned short port) {
+  isUsingProxy = true;
+  proxyServer = server;
+  proxyPort = port;
 }
 
 void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) throw() {
@@ -22,6 +30,7 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   HTTPRequest request;
   request.ingestRequestLine(css);
   request.ingestHeader(css, connection.second);
+  request.fixRequestServerField();
   request.ingestPayload(css);
 
   // check if blacklisted
@@ -34,8 +43,25 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
     return;
   }
 
-  // modify request by client
+  // check for proxy cycle
   HTTPHeader& header = request.getHeader();
+  if (isUsingProxy && header.containsName("x-forwarded-for")) {
+    string token;
+    istringstream ss(header.getValueAsString("x-forwarded-for"));
+    while (getline(ss, token, ',')) {
+      if (token == proxyServer) {
+        response.setResponseCode(504);
+        response.setProtocol("HTTP/1.0");
+        response.setPayload("Proxy chain cycle found");
+        css << response << flush;
+        return;
+      }
+    }
+  }
+
+  // modify request by client
+  bool isFromProxy = header.containsName("x-forwarded-for");
+  cout << ((isFromProxy) ? "IS FROM PROXY!!" : "not proxy") << endl;
   header.addHeader("x-forwarded-proto", "http");
   string forwardedForStr;
   if (header.containsName("x-forwarded-for"))
@@ -55,7 +81,34 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   }
 
   // send modified request to host
-  int hs = createClientSocket(request.getServer(), request.getPort());
+  string originHostServer = request.getServer();
+  if (isFromProxy) {
+    if (!header.containsName("host")) {
+      response.setResponseCode(400);
+      response.setProtocol("HTTP/1.0");
+      response.setPayload("Bad Request");
+      css << response << flush;
+      return;
+    }
+//    originHostServer = header.getValueAsString("host");
+  }
+
+//  if (isUsingProxy) {
+//    request.
+//  }
+
+  const std::string& hostServer = (isUsingProxy) ? proxyServer : originHostServer;
+  unsigned short hostPort = (isUsingProxy) ? proxyPort : request.getPort();
+  cout << "hostServer: " << hostServer << ", hostPort: " << hostPort << endl;
+  int hs = createClientSocket(hostServer, hostPort);
+  if (hs == kClientSocketError) {
+//    cout << "can't create socket to origin" << endl;
+    response.setResponseCode(400);
+    response.setProtocol("HTTP/1.0");
+    response.setPayload("Bad Request");
+    css << response << flush;
+    return;
+  }
   sockbuf hsb(hs);
   iosockstream hss(&hsb);
   hss << request << flush;
@@ -65,6 +118,7 @@ void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) thr
   response.ingestPayload(hss);
 
   // write response to client
+  cout << oslock << request << endl <<  response.getResponseCode() << osunlock<< endl;
   css << response << flush;
 
   // cache if necessary
