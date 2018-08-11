@@ -31,6 +31,7 @@ void testRtrim() {
   assert(rtrim("  abc   ") == "  abc");
   assert(rtrim("  ") == "");
   assert(rtrim("   a  b c  ") == "   a  b c");
+  assert(rtrim(" \r\nasd asd\n\r\n") == " \r\nasd asd");
   cout << "[testRtrim] ::  \t PASSED" << endl;
 }
 
@@ -42,6 +43,7 @@ void testTrim() {
   assert(trim("  abc   ") == "abc");
   assert(trim("  ") == "");
   assert(trim("   a  b c  ") == "a  b c");
+  assert(trim(" \r\nasd asd\n\r\n") == "asd asd");
   cout << "[testTrim] ::  \t\t PASSED" << endl;
 }
 

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -33,7 +34,7 @@ static string toLowerCase(const string& s) {
 static string rtrim(const string& s) {
   size_t end;
   for (end=s.length()-1; end>=0; end--) {
-    if (s[end] != ' ') break;
+    if (!isspace(static_cast<unsigned char>(s[end]))) break;
   }
   size_t len = end+1;
   string res = s.substr(0, len);
@@ -43,10 +44,10 @@ static string rtrim(const string& s) {
 static const string trim(const string& s) {
   size_t start, end, len;
   for (start=0; start<s.length(); start++) {
-    if (s[start] != ' ') break;
+    if (!isspace(static_cast<unsigned char>(s[start]))) break;
   }
   for (end=s.length()-1; end>=0; end--) {
-    if (s[end] != ' ') break;
+    if (!isspace(static_cast<unsigned char>(s[end]))) break;
   }
   len = end-start+1;
   string res = s.substr(start, len);
