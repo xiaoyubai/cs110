@@ -16,9 +16,6 @@
 #include "header.h"
 #include "payload.h"
 #include "proxy-exception.h"
-#include "ostreamlock.h"
-#include "response.h"
-#include <socket++/sockstream.h> // for sockbuf, iosockstream
 
 class HTTPRequest {
 
@@ -30,7 +27,6 @@ class HTTPRequest {
   friend std::ostream& operator<<(std::ostream& os, const HTTPRequest& rh);
   
  public:
-  std::string recover_request(); 
 
 /**
  * Ingests, parses, and stores the first line of the HTTP request.
@@ -44,7 +40,7 @@ class HTTPRequest {
  *   GET http://www.facebook.com/jerry HTTP/1.1
  *   POST http://graph.facebook.com/like?url=www.nytimes.com HTTP/1.1
  */
-  void ingestRequestLine(std::istream& instream) throw (HTTPBadRequestException);
+  void ingestRequestLine(std::istream& instream, bool isUsingProxy) throw (HTTPBadRequestException);
 
 /**
  * Ingests everything beyond the first line up to the first
@@ -87,6 +83,7 @@ class HTTPRequest {
   unsigned short getPort() const { return port; }
   const std::string& getPath() const { return path; }
   const std::string& getProtocol() const { return protocol; }
+  HTTPHeader& getHeader() { return requestHeader; }
 
 /**
  * Returns true if and only if the supplied, case-insensitive
@@ -94,8 +91,6 @@ class HTTPRequest {
  * pairs.
  */
   bool containsName(const std::string& name) const;
-  void addEntity(const std::string& clientIPAddress);
-  bool containsLoop(const std::pair<int, std::string>& connection); 
   
  private:
   std::string requestLine;

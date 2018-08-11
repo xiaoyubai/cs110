@@ -12,13 +12,13 @@ DEPS = -MMD -MF $(@:.o=.d)
 #  -std=c++14                 go with the c++14 extensions for thread support, unordered maps, etc
 #  -D_GLIBCXX_USE_NANOSLEEP   included for this_thread::sleep_for and this_thread::sleep_until support
 #  -D_GLIBCXX_USE_SCHED_YIELD included for this_thread::yield support
-CXXFLAGS = -g -Wall -pedantic -O0 -std=c++14 -D_GLIBCXX_USE_NANOSLEEP -D_GLIBCXX_USE_SCHED_YIELD -I/afs/ir/class/cs110/include -I/afs/ir/class/cs110/local/include $(DEPS)
+CXXFLAGS = -g -Wall -pedantic -O0 -std=c++14 -D_GLIBCXX_USE_NANOSLEEP -D_GLIBCXX_USE_SCHED_YIELD -I/afs/ir/class/cs110/include -I/afs/ir/class/cs110/local/include -I/usr/include/boost $(DEPS)
 
 # The LDFLAGS variable sets flags for linker
 #  -pthread   link in libpthread (thread library) to back C++11 extensions (note -pthread and not -lpthread)
 #  -lthread   link to course-specific concurrency functions and classes
 #  -lsocket++ link to open source socket++ library, which layers iostream objects over sockets
-LDFLAGS = -lpthread -L/afs/ir/class/cs110/local/lib -lthreadpool -L/afs/ir/class/cs110/local/lib -lthreads -L/afs/ir/class/cs110/lib/socket++ -lsocket++ -Wl,-rpath=/afs/ir/class/cs110/lib/socket++
+LDFLAGS = -lpthread -L/usr/include -lboost_system -lboost_thread -L/usr/include/socket++ -lsocket++ -Wl,-rpath=/usr/include/socket++
 
 # The ARFLAGS variable, if absent, defaults to rv, but I don't want a verbose printout
 ARFLAGS = r
@@ -35,6 +35,8 @@ SOURCES = \
 	request-handler.cc \
 	request.cc \
 	response.cc \
+	semaphore.cc \
+	thread-pool.cc \
 	header.cc \
 	payload.cc \
 	cache.cc \

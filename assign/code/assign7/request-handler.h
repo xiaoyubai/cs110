@@ -10,29 +10,25 @@
 
 #include <utility>
 #include <string>
-#include "blacklist.h"
 #include "cache.h"
+#include "blacklist.h"
 
 class HTTPRequestHandler {
-	public:
-		HTTPRequestHandler(); 
-		void serviceRequest(const std::pair<int, std::string>& connection) throw();
-		void clearCache();
-		void setCacheMaxAge(long maxAge);
-		void setProxy(const std::string& proxyServer, unsigned short proxyPortNumber);
-	private:
-		HTTPBlacklist blacklist;
-		HTTPCache cache;
-		std::mutex cacheLock[997];
+ public:
+  HTTPRequestHandler(){ blacklist.addToBlacklist(blacklistFile); };
+  size_t getMutexHash(const HTTPRequest& request);
+  void serviceRequest(const std::pair<int, std::string>& connection) throw();
+  void clearCache();
+  void setCacheMaxAge(long maxAge);
+  void setProxy(const std::string server, unsigned short port);
 
-		bool isUsingProxy;
-		std::string proxyServer;
-		unsigned short int proxyPortNumber;
-
-		size_t getHashCode(const HTTPRequest& request) const;
-		bool checkBlacklist(const HTTPRequest& request, const std::pair<int, std::string>& connection);
-		void checkCache(const HTTPRequest& request, const std::pair<int, std::string>& connection);
-		void shouldCache(const HTTPRequest& request, const HTTPResponse& response); 
+ private:
+  const std::string blacklistFile = "blocked-domains.txt";
+  HTTPBlacklist blacklist;
+  HTTPCache cache;
+  bool isUsingProxy = false;
+  std::string proxyServer;
+  unsigned short proxyPort;
 };
 
 #endif

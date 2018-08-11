@@ -4,160 +4,114 @@
  * Provides the implementation for the HTTPRequestHandler class.
  */
 
+#include "client-socket.h"
+#include "request.h"
 #include "request-handler.h"
 #include "response.h"
-#include "request.h"
+#include <sstream>
 #include <socket++/sockstream.h> // for sockbuf, iosockstream
+#include <unordered_set>
 #include "ostreamlock.h"
-#include <netdb.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include "client-socket.h"
 using namespace std;
 
-HTTPRequestHandler::HTTPRequestHandler() {
-	blacklist.addToBlacklist("blocked-domains.txt");
-	isUsingProxy = false;
+size_t HTTPRequestHandler::getMutexHash(const HTTPRequest& request) {
+  return cache.hashRequest(request) % cache.numMutex;
 }
 
-void HTTPRequestHandler::setProxy(const std::string& proxyServer, unsigned short proxyPortNumber) {
-	this->isUsingProxy = true;
-	this->proxyServer = proxyServer;
-	this->proxyPortNumber = proxyPortNumber;
+void HTTPRequestHandler::setProxy(const std::string server, unsigned short port) {
+  isUsingProxy = true;
+  proxyServer = server;
+  proxyPort = port;
 }
 
-size_t HTTPRequestHandler::getHashCode(const HTTPRequest& request) const {
-	return cache.getHashCode(request);
-}
+void HTTPRequestHandler::serviceRequest(const pair<int, string>& connection) throw() {
+  // parse request from client
+  sockbuf csb(connection.first);
+  iosockstream css(&csb);
+  HTTPRequest request;
+  request.ingestRequestLine(css, isUsingProxy);
+  request.ingestHeader(css, connection.second);
+  request.ingestPayload(css);
 
-void HTTPRequestHandler::serviceRequest(const std::pair<int, std::string>& connection) throw() {
-	// 1. intercept client's HTTP request
-	HTTPRequest request;
-	sockbuf sb1(connection.first);
-	istream is1(&sb1);
-	try{
-		request.ingestRequestLine(is1);
-	} catch (const HTTPBadRequestException& hpe) {
-		cerr << oslock << "HTTP Bad Request: " << hpe.what() << endl << osunlock;
-		return;
-	}
-	request.ingestHeader(is1, connection.second);
-	// 1.25 check loop
-	if(request.containsLoop(connection)) return;
-	request.addEntity(connection.second);
-	request.ingestPayload(is1); 
-	// 1.5 check blacklist and cache
-	if(checkBlacklist(request, connection)) return;
-	size_t hashCode = getHashCode(request);	// lock
-	cacheLock[hashCode].lock();
-	try{
-		checkCache(request, connection);
-	} catch (const HTTPCacheAccessException& hcae) {
-		cerr << oslock << "HTTP Cache Access Execption: " << hcae.what() << endl << osunlock;
-		return;
-	}
-	// 1.75 check whether to use another proxy
-	int clientSocket = -1;
-	if(isUsingProxy) {
-		// 2. send request to anther proxy
-		std::string forward_request = request.recover_request();
-		clientSocket  = createClientSocket(proxyServer, proxyPortNumber);
-		if (clientSocket == -1) {
-			cerr << "Count not connect to host named \"" << proxyServer << "\"" << endl;
-			return;
-		}
-		sockbuf sbx(clientSocket);
-		iosockstream  ssx(&sbx);
-		ssx << forward_request << flush;
-		// 3. receive response
-		sockbuf sb3(clientSocket);
-		istream is3(&sb3);
-		HTTPResponse response;
-		response.ingestResponseHeader(is3);
-		response.ingestPayload(is3);
-		// 3.5 should cache?
-		try{
-			shouldCache(request, response);
-		} catch (const HTTPCacheAccessException& hcae) {
-			cerr << oslock << "HTTP Cache Access Execption: " << hcae.what() << endl << osunlock;
-			return;
-		}
-		// 4. send response back to client
-		sockbuf sb4(connection.first);
-		iosockstream ss4(&sb4);
-		ss4 << response << flush;
-	} else {
-		// 2. send request to origin server
-		clientSocket = createClientSocket(request.getServer(), request.getPort());
-		if (clientSocket == -1) {
-			cerr << "Count not connect to host named \"" << request.getServer() << "\"" << endl;
-			return;
-		}
-		sockbuf sb2(clientSocket);
-		iosockstream ss2(&sb2);
-		ss2 << request << flush;
-		// 3. receive response
-		sockbuf sb3(clientSocket);
-		istream is3(&sb3);
-		HTTPResponse response;
-		response.ingestResponseHeader(is3);
-		response.ingestPayload(is3);
-		// 3.5 should cache?
-		try{
-			shouldCache(request, response);
-		} catch (const HTTPCacheAccessException& hcae) {
-			cerr << oslock << "HTTP Cache Access Execption: " << hcae.what() << endl << osunlock;
-			return;
-		}
-		// 4. send response back to client
-		sockbuf sb4(connection.first);
-		iosockstream ss4(&sb4);
-		ss4 << response << flush;
-	}
-	cacheLock[hashCode].unlock();
-}
+  // check if blacklisted
+  HTTPResponse response;
+  if (!blacklist.serverIsAllowed(request.getServer())) {
+    response.setResponseCode(403);
+    response.setProtocol("HTTP/1.0");
+    response.setPayload("Forbidden Content");
+    css << response << flush;
+    return;
+  }
 
+  // check for proxy cycle
+  HTTPHeader& header = request.getHeader();
+  if (isUsingProxy && header.containsName("x-forwarded-for")) {
+    string token;
+    istringstream ss(header.getValueAsString("x-forwarded-for"));
+    unordered_set<string> seen;
+    while (getline(ss, token, ',')) {
+      if (seen.find(token) != seen.end()) {
+        response.setResponseCode(504);
+        response.setProtocol("HTTP/1.0");
+        response.setPayload("Proxy chain cycle found");
+        css << response << flush;
+        return;
+      }
+      seen.insert(token);
+    }
+  }
 
-bool HTTPRequestHandler::checkBlacklist(const HTTPRequest& request, const std::pair<int, std::string>& connection) {
-	// check blacklist
-	if(!blacklist.serverIsAllowed(request.getServer())) {
-		sockbuf sb403(connection.first);
-		iosockstream ss403(&sb403);
-		HTTPResponse response403;
-		response403.setResponseCode(403);
-		response403.setProtocol("HTTP/1.0");
-		response403.setPayload("Forbidden Content");
-		ss403 << response403 << flush;
-		return true;
-	} else {
-		return false;
-	}
-}
+  // modify request by client
+  header.addHeader("x-forwarded-proto", "http");
+  string forwardedForStr;
+  if (header.containsName("x-forwarded-for"))
+    forwardedForStr += header.getValueAsString("x-forwarded-for") + ",";
+  forwardedForStr += connection.second;
+  header.addHeader("x-forwarded-for", forwardedForStr);
 
-void HTTPRequestHandler::checkCache(const HTTPRequest& request, const pair<int, string>& connection) {
-	// check cache
-	HTTPResponse responseCache;
-	bool containsCacheEntry = cache.containsCacheEntry(request, responseCache);
-	if(containsCacheEntry) {
-		sockbuf sbCache(connection.first);
-		iosockstream ssCache(&sbCache);
-		ssCache << responseCache << flush;
-	}
-}
+  // attempt to acquire mutex for this request
+  size_t hash = getMutexHash(request);
+  lock_guard<mutex> lg(cache.ms[hash]);
 
-void HTTPRequestHandler::shouldCache(const HTTPRequest& request, const HTTPResponse& response) {
-	// should cache?
-	if(cache.shouldCache(request, response)) {
-		cache.cacheEntry(request, response);
-	}	
+  // check if cached only after modifying
+  // (because i will cache the modified request)
+  if (cache.containsCacheEntry(request, response)) {
+    css << response << flush;
+    return;
+  }
+
+  // send modified request to host
+  const std::string& hostServer = (isUsingProxy) ? proxyServer : request.getServer();
+  unsigned short hostPort = (isUsingProxy) ? proxyPort : request.getPort();
+  int hs = createClientSocket(hostServer, hostPort);
+  if (hs == kClientSocketError) {
+    response.setResponseCode(400);
+    response.setProtocol("HTTP/1.0");
+    response.setPayload("Bad Request");
+    css << response << flush;
+    return;
+  }
+  sockbuf hsb(hs);
+  iosockstream hss(&hsb);
+  hss << request << flush;
+
+  // receive response from host
+  response.ingestResponseHeader(hss);
+  response.ingestPayload(hss);
+
+  // write response to client
+  css << response << flush;
+
+  // cache if necessary
+  if (cache.shouldCache(request, response)) cache.cacheEntry(request, response);
 }
 
 // the following two methods needs to be completed 
 // once you incorporate your HTTPCache into your HTTPRequestHandler
 void HTTPRequestHandler::clearCache() {
-	cache.clear();
+  cache.clear();
 }
 
 void HTTPRequestHandler::setCacheMaxAge(long maxAge) {
-	cache.setMaxAge(maxAge);
+  cache.setMaxAge(maxAge);
 }

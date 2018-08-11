@@ -23,7 +23,6 @@ class HTTPHeader {
   
  public:
 
-
 /**
  * Ingests the entire header of what's assumed to be either an
  * HTTP request or response.

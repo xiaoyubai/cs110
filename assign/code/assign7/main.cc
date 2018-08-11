@@ -11,7 +11,6 @@
 #include "proxy.h"
 #include "proxy-exception.h"
 #include "ostreamlock.h"
-#include "thread-pool.h"
 
 using namespace std;
 
@@ -85,11 +84,9 @@ int main(int argc, char *argv[]) {
       cout << "Requests will be directed toward another proxy at " 
            << proxy.getProxyServer() << ":" << proxy.getProxyPortNumber() << "." << endl;
     }
-	ThreadPool pool(64);
     while (true) {
-	  pool.schedule([&proxy]{proxy.acceptAndProxyRequest();});
+      proxy.acceptAndProxyRequest();
     }
-	pool.wait();
   } catch (const HTTPProxyException& hpe) {
     cerr << "Fatal Error: " << hpe.what() << endl;
     cerr << "Exiting..... " << endl;
