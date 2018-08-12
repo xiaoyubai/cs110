@@ -22,11 +22,9 @@
 #include "mapreduce-worker.h"
 
 class MapReduceMapper: protected MapReduceWorker {
-	public:
-		MapReduceMapper(const std::string& serverHost, unsigned short serverPort,
-				const std::string& cwd, const std::string& executable,
-				const std::string& outputPath, unsigned short numHashCodes);
-		void map() const;
-	private:
-		unsigned short numHashCodes;
+ public:
+  MapReduceMapper(const std::string& serverHost, unsigned short serverPort,
+                  const std::string& cwd, const std::string& executable,
+                  const std::string& outputPath);
+  void map() const;
 };

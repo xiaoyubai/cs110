@@ -8,15 +8,14 @@
  */
 
 #include "mapreduce-reducer.h"
-static const int kExpectedArgumentCount = 7;
+static const int kExpectedArgumentCount = 6;
 int main(int argc, char *argv[]) {
   if (argc != kExpectedArgumentCount) return 1;
   MapReduceReducer mrr(/* serverHost = */ argv[1],
                        /* serverPort = */ atoi(argv[2]),
                        /* cwd = */ argv[3],
                        /* mapper = */ argv[4],
-					   /* inputPath = */ argv[5],
-                       /* outputPath = */ argv[6]);
+                       /* outputPath = */ argv[5]);
   mrr.reduce();
   return 0;
 }

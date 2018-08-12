@@ -19,14 +19,11 @@
 #include "mapreduce-worker.h"
 
 class MapReduceReducer: protected MapReduceWorker {
-	public:
-		MapReduceReducer(const std::string& serverHost, 
-				unsigned short serverPort,
-				const std::string& cwd, 
-				const std::string& executable, 
-				const std::string& inputPath,
-				const std::string& outputPath);
-		void reduce() const;
-	private:
-		std::string inputPath;
+ public:
+  MapReduceReducer(const std::string& serverHost, 
+                   unsigned short serverPort,
+                   const std::string& cwd, 
+                   const std::string& executable, 
+                   const std::string& outputPath);
+  void reduce() const;
 };

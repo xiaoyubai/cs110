@@ -5,7 +5,6 @@
  */
 
 #include "mapreduce-server.h"
-#include "thread-pool.h"
 #include <iostream>              // for cout
 #include <getopt.h>              // for getopt_long
 #include <sstream>               // for ostringstream
@@ -44,18 +43,17 @@ using namespace std;
  */
 static const size_t kNumWorkerThreads = 32;
 MapReduceServer::MapReduceServer(int argc, char *argv[]) throw (MapReduceServerException) 
-	: user(getUser()), host(getHost()), cwd(getCurrentWorkingDirectory()),
-	serverPort(computeDefaultPortForUser()), verbose(true), mapOnly(false),
-	serverIsRunning(false) {
-		parseArgumentList(argc, argv);
-		if (verbose) cout << "Determining which machines in the myth cluster can be used... " << flush;
-		nodes = loadMapReduceNodes();
-		if (verbose) cout << "[done!!]" << endl;
-		buildIPAddressMap();
-		startServer();
-		logServerConfiguration(cout);
-
-	}
+  : user(getUser()), host(getHost()), cwd(getCurrentWorkingDirectory()),
+    serverPort(computeDefaultPortForUser()), verbose(true), mapOnly(false),
+    serverIsRunning(false) {
+  parseArgumentList(argc, argv);
+  if (verbose) cout << "Determining which machines in the myth cluster can be used... " << flush;
+  nodes = loadMapReduceNodes();
+  if (verbose) cout << "[done!!]" << endl;
+  buildIPAddressMap();
+  startServer();
+  logServerConfiguration(cout);
+}
 
 /**
  * Method: run
@@ -65,10 +63,7 @@ MapReduceServer::MapReduceServer(int argc, char *argv[]) throw (MapReduceServerE
  * methods called by run to gain a better sense of how everything works.
  */
 void MapReduceServer::run() throw() {
-	spawnMappers();
-	if(!mapOnly) {
-		spawnReducers();
-	}
+  spawnMappers();
 }
 
 /**
@@ -79,67 +74,67 @@ void MapReduceServer::run() throw() {
 static const string kUsageString = "./mr --mapper <mapper-name> --reducer <reducer-name> --config <config-file> [--quiet] [--port <port>] [--map-only]";
 static const unsigned short kDefaultServerPort = 12345;
 void MapReduceServer::parseArgumentList(int argc, char *argv[]) throw (MapReduceServerException) {
-	struct option options[] = {
-		{"mapper", required_argument, NULL, 'm'},
-		{"reducer", required_argument, NULL, 'r'},
-		{"quiet", no_argument, NULL, 'q'},
-		{"port", required_argument, NULL, 'p'},
-		{"config", required_argument, NULL, 'c'},
-		{"map-only", no_argument, NULL, 'o'},
-		{NULL, 0, NULL, 0},
-	};
+  struct option options[] = {
+    {"mapper", required_argument, NULL, 'm'},
+    {"reducer", required_argument, NULL, 'r'},
+    {"quiet", no_argument, NULL, 'q'},
+    {"port", required_argument, NULL, 'p'},
+    {"config", required_argument, NULL, 'c'},
+    {"map-only", no_argument, NULL, 'o'},
+    {NULL, 0, NULL, 0},
+  };
+  
+  ostringstream oss;
+  string configFilename;
+  while (true) {
+    int ch = getopt_long(argc, argv, "m:r:qp:c:o", options, NULL);
+    if (ch == -1) break;
+    switch (ch) {
+    case 'm':
+      if (!mapper.empty()) {
+        oss << "The mapper should be specified exactly once." << endl;
+        oss << kUsageString;
+        throw MapReduceServerException(oss.str());
+      }
+      mapper = optarg;
+      break;
+    case 'r':
+      if (!reducer.empty()) {
+        oss << "The reducer should be specified exactly once." << endl;
+        oss << kUsageString;
+        throw MapReduceServerException(oss.str());
+      }
+      reducer = optarg;
+      break;
+    case 'q':
+      verbose = false;
+      break;
+    case 'p':
+      serverPort = extractPortNumber(optarg);
+      break;
+    case 'c':
+      configFilename = optarg;
+      break;
+    case 'o':
+      mapOnly = true;
+      break;
+    default:
+      oss << "Unrecognized or improperly supplied flag." << endl;
+      oss << kUsageString;
+      throw MapReduceServerException(oss.str());
+    }
+  }
 
-	ostringstream oss;
-	string configFilename;
-	while (true) {
-		int ch = getopt_long(argc, argv, "m:r:qp:c:o", options, NULL);
-		if (ch == -1) break;
-		switch (ch) {
-			case 'm':
-				if (!mapper.empty()) {
-					oss << "The mapper should be specified exactly once." << endl;
-					oss << kUsageString;
-					throw MapReduceServerException(oss.str());
-				}
-				mapper = optarg;
-				break;
-			case 'r':
-				if (!reducer.empty()) {
-					oss << "The reducer should be specified exactly once." << endl;
-					oss << kUsageString;
-					throw MapReduceServerException(oss.str());
-				}
-				reducer = optarg;
-				break;
-			case 'q':
-				verbose = false;
-				break;
-			case 'p':
-				serverPort = extractPortNumber(optarg);
-				break;
-			case 'c':
-				configFilename = optarg;
-				break;
-			case 'o':
-				mapOnly = true;
-				break;
-			default:
-				oss << "Unrecognized or improperly supplied flag." << endl;
-				oss << kUsageString;
-				throw MapReduceServerException(oss.str());
-		}
-	}
+  argc -= optind;
+  if (argc > 0) {
+    oss << "Too many arguments." << endl;
+    oss << kUsageString;
+    throw MapReduceServerException(oss.str());
+  }
 
-	argc -= optind;
-	if (argc > 0) {
-		oss << "Too many arguments." << endl;
-		oss << kUsageString;
-		throw MapReduceServerException(oss.str());
-	}
-
-	confirmRequiredArgumentsArePresent(configFilename);
-	initializeFromConfigFile(configFilename);
-	confirmExecutablesAreExecutable();
+  confirmRequiredArgumentsArePresent(configFilename);
+  initializeFromConfigFile(configFilename);
+  confirmExecutablesAreExecutable();
 }
 
 /**
@@ -151,8 +146,8 @@ void MapReduceServer::parseArgumentList(int argc, char *argv[]) throw (MapReduce
  */
 static const unsigned short kLowestOpenPortNumber = 1024;
 unsigned short MapReduceServer::computeDefaultPortForUser() const throw () {
-	size_t hashValue = hash<string>()(user + "@" + host); // ensure different than http-proxy default port
-	return hashValue % (USHRT_MAX - kLowestOpenPortNumber) + kLowestOpenPortNumber;
+  size_t hashValue = hash<string>()(user + "@" + host); // ensure different than http-proxy default port
+  return hashValue % (USHRT_MAX - kLowestOpenPortNumber) + kLowestOpenPortNumber;
 }
 
 /**
@@ -161,22 +156,22 @@ unsigned short MapReduceServer::computeDefaultPortForUser() const throw () {
  * Confirms that certain flags and arguments were supplied on the command line.
  */
 void MapReduceServer::confirmRequiredArgumentsArePresent(const string& configFilename) const throw (MapReduceServerException) {
-	ostringstream oss;
-	if (mapper.empty()) {
-		oss << "The mapper must be specified." << endl;
-		oss << kUsageString;
-		throw MapReduceServerException(oss.str());
-	}
-	if (reducer.empty()) {
-		oss << "The reducer must be specified." << endl;
-		oss << kUsageString;
-		throw MapReduceServerException(oss.str());
-	}
-	if (configFilename.empty()) {
-		oss << "You must supply a configuration file as an argument." << endl;
-		oss << kUsageString;
-		throw MapReduceServerException(oss.str());
-	}
+  ostringstream oss;
+  if (mapper.empty()) {
+    oss << "The mapper must be specified." << endl;
+    oss << kUsageString;
+    throw MapReduceServerException(oss.str());
+  }
+  if (reducer.empty()) {
+    oss << "The reducer must be specified." << endl;
+    oss << kUsageString;
+    throw MapReduceServerException(oss.str());
+  }
+  if (configFilename.empty()) {
+    oss << "You must supply a configuration file as an argument." << endl;
+    oss << kUsageString;
+    throw MapReduceServerException(oss.str());
+  }
 }
 
 /**
@@ -186,23 +181,23 @@ void MapReduceServer::confirmRequiredArgumentsArePresent(const string& configFil
  * identify executables that can be run by the user driving the map reduce job.
  */
 void MapReduceServer::confirmExecutablesAreExecutable() const throw (MapReduceServerException) {
-	struct executable {
-		string executableName;
-		string errorMessage; 
-	} executables[] = {
-		{mapper, "The mapper client named \"" + mapper + "\" either doesn't exist or isn't executable."},
-		{reducer, "The reducer client named \"" + reducer + "\" either doesn't exist or isn't executable."},
-		{mapperExecutable, "The mapper executable named \"" + mapperExecutable + "\" (to be invoked by \"" + mapper + ") either doesn't exist or isn't executable."},
-		{reducerExecutable, "The reducer executable named \"" + reducerExecutable + "\" (to be invoked by \"" + reducer + ") either doesn't exist or isn't executable."},
-	};
+  struct executable {
+    string executableName;
+    string errorMessage; 
+  } executables[] = {
+    {mapper, "The mapper client named \"" + mapper + "\" either doesn't exist or isn't executable."},
+    {reducer, "The reducer client named \"" + reducer + "\" either doesn't exist or isn't executable."},
+    {mapperExecutable, "The mapper executable named \"" + mapperExecutable + "\" (to be invoked by \"" + mapper + ") either doesn't exist or isn't executable."},
+    {reducerExecutable, "The reducer executable named \"" + reducerExecutable + "\" (to be invoked by \"" + reducer + ") either doesn't exist or isn't executable."},
+  };
 
-	for (const executable& e: executables) {
-		if (access(e.executableName.c_str(), X_OK) != 0) {
-			ostringstream oss;
-			oss << e.errorMessage;
-			throw MapReduceServerException(oss.str());
-		}
-	}
+  for (const executable& e: executables) {
+    if (access(e.executableName.c_str(), X_OK) != 0) {
+      ostringstream oss;
+      oss << e.errorMessage;
+      throw MapReduceServerException(oss.str());
+    }
+  }
 }
 
 /**
@@ -216,47 +211,47 @@ void MapReduceServer::confirmExecutablesAreExecutable() const throw (MapReduceSe
  * the possibility that the server crashes in some more oblique way later on.
  */
 static const string kConfigFileKeys[] = {
-	"mapper", "reducer", "num-mappers", "num-reducers",
-	"input-path", "intermediate-path", "output-path"
+  "mapper", "reducer", "num-mappers", "num-reducers",
+  "input-path", "intermediate-path", "output-path"
 };
 static const size_t kNumConfigFileKeys = sizeof(kConfigFileKeys)/sizeof(kConfigFileKeys[0]);
 void MapReduceServer::initializeFromConfigFile(const string& configFileName) throw (MapReduceServerException) {
-	ifstream infile(configFileName);
-	if (!infile) {
-		ostringstream oss;
-		oss << "Configuration file named \"" << configFileName << "\" could not be opened.";
-		throw MapReduceServerException(oss.str());
-	}
+  ifstream infile(configFileName);
+  if (!infile) {
+    ostringstream oss;
+    oss << "Configuration file named \"" << configFileName << "\" could not be opened.";
+    throw MapReduceServerException(oss.str());
+  }
 
-	set<string> requiredKeys(kConfigFileKeys, kConfigFileKeys + kNumConfigFileKeys);
-	set<string> suppliedKeys;
-	while (true) {
-		string key;
-		getline(infile, key, /* stopchar = */ ' ');
-		if (infile.fail()) break;
-		key = trim(key);
-		if (key.empty()) continue;
-		if (requiredKeys.find(key) == requiredKeys.cend()) {
-			ostringstream oss;
-			oss << "Configuration file key of \"" << key << "\" not recognized.";
-			throw MapReduceServerException(oss.str());
-		}
-		if (suppliedKeys.find(key) != suppliedKeys.cend()) {
-			ostringstream oss;
-			oss << "Configuration file key of \"" << key << "\" supplied multiple times.";
-			throw MapReduceServerException(oss.str());
-		}
-		suppliedKeys.insert(key);
-		string value;
-		getline(infile, value); // read rest of line
-		applyToServer(key, trim(value));
-	}
-
-	if (suppliedKeys != requiredKeys) {
-		ostringstream oss;
-		oss << "One or more required keys missing from configuration file." << endl;
-		throw MapReduceServerException(oss.str());
-	}
+  set<string> requiredKeys(kConfigFileKeys, kConfigFileKeys + kNumConfigFileKeys);
+  set<string> suppliedKeys;
+  while (true) {
+    string key;
+    getline(infile, key, /* stopchar = */ ' ');
+    if (infile.fail()) break;
+    key = trim(key);
+    if (key.empty()) continue;
+    if (requiredKeys.find(key) == requiredKeys.cend()) {
+      ostringstream oss;
+      oss << "Configuration file key of \"" << key << "\" not recognized.";
+      throw MapReduceServerException(oss.str());
+    }
+    if (suppliedKeys.find(key) != suppliedKeys.cend()) {
+      ostringstream oss;
+      oss << "Configuration file key of \"" << key << "\" supplied multiple times.";
+      throw MapReduceServerException(oss.str());
+    }
+    suppliedKeys.insert(key);
+    string value;
+    getline(infile, value); // read rest of line
+    applyToServer(key, trim(value));
+  }
+  
+  if (suppliedKeys != requiredKeys) {
+    ostringstream oss;
+    oss << "One or more required keys missing from configuration file." << endl;
+    throw MapReduceServerException(oss.str());
+  }
 }
 
 /**
@@ -270,21 +265,21 @@ void MapReduceServer::initializeFromConfigFile(const string& configFileName) thr
 static const size_t kMinWorkers = 1;
 static const size_t kMaxWorkers = kNumWorkerThreads;
 void MapReduceServer::applyToServer(const string& key, const string& value) throw (MapReduceServerException) {
-	if (key == "mapper") {
-		mapperExecutable = value;
-	} else if (key == "reducer") {
-		reducerExecutable = value;
-	} else if (key == "num-mappers") {
-		numMappers = parseNumberInRange(key, value, kMinWorkers, kMaxWorkers);
-	} else if (key == "num-reducers") {
-		numReducers = parseNumberInRange(key, value, kMinWorkers, kMaxWorkers);
-	} else if (key == "input-path") {
-		inputPath = ensureDirectoryExists(key, value, cwd);
-	} else if (key == "intermediate-path") {
-		intermediatePath = ensureDirectoryExists(key, value, cwd);
-	} else if (key == "output-path") {
-		outputPath = ensureDirectoryExists(key, value, cwd);
-	}
+  if (key == "mapper") {
+    mapperExecutable = value;
+  } else if (key == "reducer") {
+    reducerExecutable = value;
+  } else if (key == "num-mappers") {
+    numMappers = parseNumberInRange(key, value, kMinWorkers, kMaxWorkers);
+  } else if (key == "num-reducers") {
+    numReducers = parseNumberInRange(key, value, kMinWorkers, kMaxWorkers);
+  } else if (key == "input-path") {
+    inputPath = ensureDirectoryExists(key, value, cwd);
+  } else if (key == "intermediate-path") {
+    intermediatePath = ensureDirectoryExists(key, value, cwd);
+  } else if (key == "output-path") {
+    outputPath = ensureDirectoryExists(key, value, cwd);
+  }
 }
 
 /**
@@ -295,16 +290,16 @@ void MapReduceServer::applyToServer(const string& key, const string& value) thro
  * influence execution.
  */
 void MapReduceServer::logServerConfiguration(ostream& os) throw() {
-	if (!verbose) return;
-	os << "Mapper executable: " << mapperExecutable << endl;
-	os << "Reducer executable: " << reducerExecutable << endl;
-	os << "Number of Mapping Workers: " << numMappers << endl;
-	os << "Number of Reducing Workers: " << numReducers << endl;
-	os << "Input Path: " << inputPath << endl;
-	os << "Intermediate Path: " << intermediatePath << endl;
-	os << "Output Path: " << outputPath << endl;
-	os << "Server running on port " << serverPort << endl;
-	os << endl;
+  if (!verbose) return;
+  os << "Mapper executable: " << mapperExecutable << endl;
+  os << "Reducer executable: " << reducerExecutable << endl;
+  os << "Number of Mapping Workers: " << numMappers << endl;
+  os << "Number of Reducing Workers: " << numReducers << endl;
+  os << "Input Path: " << inputPath << endl;
+  os << "Intermediate Path: " << intermediatePath << endl;
+  os << "Output Path: " << outputPath << endl;
+  os << "Server running on port " << serverPort << endl;
+  os << endl;
 }
 
 /**
@@ -315,18 +310,18 @@ void MapReduceServer::logServerConfiguration(ostream& os) throw() {
  * IP addresses are more readily surfaced by all of the socket API functions.
  */
 void MapReduceServer::buildIPAddressMap() throw() {
-	ipAddressMap["127.0.0.1"] = host + ".stanford.edu";
-	for (const string& node: nodes) {
-		struct hostent *he = gethostbyname(node.c_str());
-		if (he == NULL) {
-			cerr << node << ".stanford.edu is unreachable." << endl;
-			continue;
-		}
-		for (size_t i = 0; he->h_addr_list[i] != NULL; i++) {
-			string ipAddress = inet_ntoa(*(struct in_addr *)(he->h_addr_list[i]));
-			ipAddressMap[ipAddress] = node + ".stanford.edu";
-		}
-	}
+  ipAddressMap["127.0.0.1"] = host + ".stanford.edu";
+  for (const string& node: nodes) {
+    struct hostent *he = gethostbyname(node.c_str());
+    if (he == NULL) {
+      cerr << node << ".stanford.edu is unreachable." << endl;
+      continue;
+    }
+    for (size_t i = 0; he->h_addr_list[i] != NULL; i++) {
+      string ipAddress = inet_ntoa(*(struct in_addr *)(he->h_addr_list[i]));
+      ipAddressMap[ipAddress] = node + ".stanford.edu";
+    }
+  }
 }
 
 /**
@@ -336,23 +331,23 @@ void MapReduceServer::buildIPAddressMap() throw() {
  * list with the absolute path names of all these files.
  */
 void MapReduceServer::stageFiles(const std::string& directory, list<string>& files) throw() {
-	DIR *dir = opendir(directory.c_str());
-	if (dir == NULL) {
-		cerr << "Directory named \"" << directory << "\" could not be opened." << endl;
-		exit(1); // this is serious enough that we should just end the program
-	} 
+  DIR *dir = opendir(directory.c_str());
+  if (dir == NULL) {
+    cerr << "Directory named \"" << directory << "\" could not be opened." << endl;
+    exit(1); // this is serious enough that we should just end the program
+  } 
+  
+  while (true) {
+    struct dirent *ent = readdir(dir);
+    if (ent == NULL) break;
+    if (ent->d_name[0] == '.') continue; // ".", "..", or some hidden file should be ignored
+    string file(directory);
+    file += "/";
+    file += ent->d_name;
+    files.push_back(file);
+  }
 
-	while (true) {
-		struct dirent *ent = readdir(dir);
-		if (ent == NULL) break;
-		if (ent->d_name[0] == '.') continue; // ".", "..", or some hidden file should be ignored
-		string file(directory);
-		file += "/";
-		file += ent->d_name;
-		files.push_back(file);
-	}
-
-	closedir(dir); // ignore error, since we can still proceed without having closed the directory
+  closedir(dir); // ignore error, since we can still proceed without having closed the directory
 }
 
 /**
@@ -365,14 +360,14 @@ void MapReduceServer::stageFiles(const std::string& directory, list<string>& fil
  * until all input files have been processed, run groupByKey, and so forth.
  */
 void MapReduceServer::startServer() throw (MapReduceServerException) {
-	serverSocket = createServerSocket(serverPort);
-	if (serverSocket == kServerSocketFailure) {
-		ostringstream oss;
-		oss << "Port " << serverPort << " is already in use, so server could not be launched.";
-		throw MapReduceServerException(oss.str());
-	}
-
-	serverThread = thread([this] { orchestrateWorkers(); });
+  serverSocket = createServerSocket(serverPort);
+  if (serverSocket == kServerSocketFailure) {
+    ostringstream oss;
+    oss << "Port " << serverPort << " is already in use, so server could not be launched.";
+    throw MapReduceServerException(oss.str());
+  }
+  
+  serverThread = thread([this] { orchestrateWorkers(); });
 }
 
 /**
@@ -383,19 +378,19 @@ void MapReduceServer::startServer() throw (MapReduceServerException) {
  * spawned workers.
  */
 void MapReduceServer::orchestrateWorkers() throw () {
-	serverIsRunning = true;
-	while (true) {
-		struct sockaddr_in clientAddress;
-		socklen_t clientAddressSize = sizeof(clientAddress);
-		memset(&clientAddress, 0, clientAddressSize);
-		int clientSocket = accept(serverSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
-		if (!serverIsRunning) { close(clientSocket); close(serverSocket); break; }
-		string clientIPAddress(inet_ntoa(clientAddress.sin_addr));
-		if (verbose) 
-			cout << oslock << "Received a connection request from " 
-				<< ipAddressMap[clientIPAddress] << "." << endl << osunlock;
-		handleRequest(clientSocket, clientIPAddress);
-	}
+  serverIsRunning = true;
+  while (true) {
+    struct sockaddr_in clientAddress;
+    socklen_t clientAddressSize = sizeof(clientAddress);
+    memset(&clientAddress, 0, clientAddressSize);
+    int clientSocket = accept(serverSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
+    if (!serverIsRunning) { close(clientSocket); close(serverSocket); break; }
+    string clientIPAddress(inet_ntoa(clientAddress.sin_addr));
+    if (verbose) 
+      cout << oslock << "Received a connection request from " 
+           << ipAddressMap[clientIPAddress] << "." << endl << osunlock;
+    handleRequest(clientSocket, clientIPAddress);
+  }
 }
 
 /**
@@ -406,56 +401,54 @@ void MapReduceServer::orchestrateWorkers() throw () {
  * received.
  */
 void MapReduceServer::handleRequest(int clientSocket, const string& clientIPAddress) throw() {
-	if (verbose) 
-		cout << oslock << "Incoming communication from " << ipAddressMap[clientIPAddress]
-			<< " on descriptor " << clientSocket << "." << endl << osunlock;
-	sockbuf sb(clientSocket);
-	iostream ss(&sb);
-	MRMessage message;
-	string payload;
-	try {
-		receiveMessage(ss, message, payload);
-	} catch (exception& e) {
-		if (verbose)
-			cout << oslock << "Spurious connection received from " << ipAddressMap[clientIPAddress]
-				<< " on descriptor " << clientSocket << "." << endl << osunlock;
-		return;
-	}
-
-	if (message == kWorkerReady) {
-		string pattern;
-		fileLock.lock();
-		bool success = surfaceNextFilePattern(pattern);
-		fileLock.unlock();
-		if (success) {
-			if (verbose)
-				cout << oslock << "Instructing worker at " << ipAddressMap[clientIPAddress] << " to process "
-					<< "this pattern: \"" << pattern << "\"" << endl << osunlock;
-			sendJobStart(ss, pattern);
-		} else { // no more patterns to process, so kill the worker
-			if (verbose) 
-				cout << oslock << "Informing worker at " << ipAddressMap[clientIPAddress] << " that all "
-					<< "file patterns have been processed." << endl << osunlock;
-			sendServerDone(ss); // informs worker to exit, server side system call returns, surrounding thread exits 
-		}
-	} else if (message == kJobSucceeded) {
-		string pattern = trim(payload);
-		markFilePatternAsProcessed(clientIPAddress, pattern);
-	} else if (message == kJobFailed) {
-		string pattern = trim(payload);
-		rescheduleFilePattern(clientIPAddress, pattern);
-	} else if (message == kJobInfo) {
-		string workerInfo = trim(payload);
-		if (verbose) cout << oslock << workerInfo << endl << osunlock;
-	} else {
-		if (verbose) 
-			cout << oslock << "Ignoring unrecognized message type of \"" 
-				<< message << "\"." << endl << osunlock;
-	}
-
-	if (verbose) 
-		cout << oslock << "Conversation with " << ipAddressMap[clientIPAddress] 
-			<< " complete." << endl << osunlock;
+  if (verbose) 
+    cout << oslock << "Incoming communication from " << ipAddressMap[clientIPAddress]
+         << " on descriptor " << clientSocket << "." << endl << osunlock;
+  sockbuf sb(clientSocket);
+  iostream ss(&sb);
+  MRMessage message;
+  string payload;
+  try {
+    receiveMessage(ss, message, payload);
+  } catch (exception& e) {
+    if (verbose)
+      cout << oslock << "Spurious connection received from " << ipAddressMap[clientIPAddress]
+           << " on descriptor " << clientSocket << "." << endl << osunlock;
+    return;
+  }
+  
+  if (message == kWorkerReady) {
+    string pattern;
+    bool success = surfaceNextFilePattern(pattern);
+    if (success) {
+      if (verbose)
+        cout << oslock << "Instructing worker at " << ipAddressMap[clientIPAddress] << " to process "
+             << "this pattern: \"" << pattern << "\"" << endl << osunlock;
+      sendJobStart(ss, pattern);
+    } else { // no more patterns to process, so kill the worker
+      if (verbose) 
+        cout << oslock << "Informing worker at " << ipAddressMap[clientIPAddress] << " that all "
+             << "file patterns have been processed." << endl << osunlock;
+      sendServerDone(ss); // informs worker to exit, server side system call returns, surrounding thread exits 
+    }
+  } else if (message == kJobSucceeded) {
+    string pattern = trim(payload);
+    markFilePatternAsProcessed(clientIPAddress, pattern);
+  } else if (message == kJobFailed) {
+    string pattern = trim(payload);
+    rescheduleFilePattern(clientIPAddress, pattern);
+  } else if (message == kJobInfo) {
+    string workerInfo = trim(payload);
+    if (verbose) cout << oslock << workerInfo << endl << osunlock;
+  } else {
+    if (verbose) 
+      cout << oslock << "Ignoring unrecognized message type of \"" 
+           << message << "\"." << endl << osunlock;
+  }
+  
+  if (verbose) 
+    cout << oslock << "Conversation with " << ipAddressMap[clientIPAddress] 
+         << " complete." << endl << osunlock;
 }
 
 /**
@@ -467,11 +460,11 @@ void MapReduceServer::handleRequest(int clientSocket, const string& clientIPAddr
  * populated the space referenced by pattern with it).
  */
 bool MapReduceServer::surfaceNextFilePattern(std::string& pattern) throw() {
-	if (unprocessed.empty()) return false;
-	pattern = unprocessed.front();
-	unprocessed.pop_front();
-	inflight.insert(pattern);
-	return true;
+  if (unprocessed.empty()) return false;
+  pattern = unprocessed.front();
+  unprocessed.pop_front();
+  inflight.insert(pattern);
+  return true;
 }
 
 /**
@@ -481,12 +474,12 @@ bool MapReduceServer::surfaceNextFilePattern(std::string& pattern) throw() {
  * the supplied IP address) managed to fully process the supplied file pattern.
  */
 void MapReduceServer::markFilePatternAsProcessed(const std::string& clientIPAddress, 
-		const std::string& pattern) throw() {
-	inflight.erase(pattern);
-	if (verbose) 
-		cout << oslock << "File pattern \"" << pattern << "\" " 
-			<< "fully processed by worker at " << ipAddressMap[clientIPAddress] << "." 
-			<< endl << osunlock;
+                                                 const std::string& pattern) throw() {
+  inflight.erase(pattern);
+  if (verbose) 
+    cout << oslock << "File pattern \"" << pattern << "\" " 
+         << "fully processed by worker at " << ipAddressMap[clientIPAddress] << "." 
+         << endl << osunlock;
 }
 
 /**
@@ -500,36 +493,13 @@ void MapReduceServer::markFilePatternAsProcessed(const std::string& clientIPAddr
  * it later, when it bubbles to the front.
  */
 void MapReduceServer::rescheduleFilePattern(const std::string& clientIPAddress, 
-		const std::string& pattern) throw() {
-	inflight.erase(pattern);
-	unprocessed.push_back(pattern);
-	if (verbose) 
-		cout << oslock << "File pattern \"" << pattern << "\" " 
-			<< "not properly processed by worker at " << ipAddressMap[clientIPAddress] << ", so rescheduling." 
-			<< endl << osunlock;
-}
-
-void MapReduceServer::spawnReducers() throw() {
-	ThreadPool pool(kNumWorkerThreads);
-	// stageFiles(inputPath, unprocessed);
-	unprocessed.clear();
-	for(unsigned int i = 0; i < numMappers * numReducers; i++) {
-		unprocessed.push_back(intermediatePath + "/*." + numberToString(i) + ".mapped");
-	}
-	vector<string> reducerNodes(nodes);
-
-	for(size_t w = 0; w < kNumWorkerThreads; w++) {
-		random_shuffle(reducerNodes.begin(), reducerNodes.end());
-		const string& reducerNode = reducerNodes[0];
-		string command = buildReducerCommand(reducerNode, reducerExecutable, outputPath);
-		// cout << oslock << "==== command: " << command << endl << osunlock;
-		pool.schedule([this, reducerNode, command]{spawnWorker(reducerNode, command);});
-	}
-	pool.wait();
-
-	if (verbose) cout << "Reducing of all input chunks now complete." << endl;
-	// cout << oslock << "==== checkpoint" << endl << osunlock;
-	dumpFileHashes(outputPath);
+                                            const std::string& pattern) throw() {
+  inflight.erase(pattern);
+  unprocessed.push_back(pattern);
+  if (verbose) 
+    cout << oslock << "File pattern \"" << pattern << "\" " 
+         << "not properly processed by worker at " << ipAddressMap[clientIPAddress] << ", so rescheduling." 
+         << endl << osunlock;
 }
 
 /**
@@ -545,38 +515,15 @@ void MapReduceServer::spawnReducers() throw() {
  * in sequence on just one).
  */
 void MapReduceServer::spawnMappers() throw() {
-	ThreadPool pool(kNumWorkerThreads);
-	stageFiles(inputPath, unprocessed);
-	vector<string> mapperNodes(nodes);
-
-	for(size_t w = 0; w < kNumWorkerThreads; w++) {
-		random_shuffle(mapperNodes.begin(), mapperNodes.end());
-		const string& mapperNode = mapperNodes[0];
-		string command = buildMapperCommand(mapperNode, mapperExecutable, intermediatePath);
-		pool.schedule([this, mapperNode, command]{spawnWorker(mapperNode, command);});
-	}
-	pool.wait();
-
-	if (verbose) cout << "Mapping of all input chunks now complete." << endl;
-	if (!mapOnly) return;
-	dumpFileHashes(intermediatePath);
-}
-
-string MapReduceServer::buildReducerCommand(const string& remoteHost, 
-		const string& executable, 
-		const string& outputPath) throw() {
-	ostringstream oss;
-	string pathToReducer = reducer[0] == '/' ? reducer : cwd + "/" + reducer;
-	oss << "ssh -o ConnectTimeout=15 " << user << "@" << remoteHost
-		<< " '" << pathToReducer
-		<< " " << host
-		<< " " << serverPort
-		<< " " << cwd
-		<< " " << executable
-		<< " " << intermediatePath
-		<< " " << outputPath 
-		<< "'";
-	return oss.str();
+  stageFiles(inputPath, unprocessed);
+  vector<string> mapperNodes(nodes);
+  random_shuffle(mapperNodes.begin(), mapperNodes.end());
+  const string& mapperNode = mapperNodes[0];
+  string command = buildMapperCommand(mapperNode, mapperExecutable, intermediatePath);
+  spawnWorker(mapperNode, command);
+  if (verbose) cout << "Mapping of all input chunks now complete." << endl;
+  if (!mapOnly) return;
+  dumpFileHashes(intermediatePath);
 }
 
 /**
@@ -586,20 +533,19 @@ string MapReduceServer::buildReducerCommand(const string& remoteHost,
  * the system (see "man system") function.  See spawnWorker below for even more information.
  */
 string MapReduceServer::buildMapperCommand(const string& remoteHost, 
-		const string& executable, 
-		const string& outputPath) throw() {
-	ostringstream oss;
-	string pathToMapper = mapper[0] == '/' ? mapper : cwd + "/" + mapper;
-	oss << "ssh -o ConnectTimeout=15 " << user << "@" << remoteHost
-		<< " '" << pathToMapper
-		<< " " << host
-		<< " " << serverPort
-		<< " " << cwd
-		<< " " << executable
-		<< " " << outputPath 
-		<< " " << numMappers * numReducers
-		<< "'";
-	return oss.str();
+                                           const string& executable, 
+                                           const string& outputPath) throw() {
+  ostringstream oss;
+  string pathToMapper = mapper[0] == '/' ? mapper : cwd + "/" + mapper;
+  oss << "ssh -o ConnectTimeout=5 " << user << "@" << remoteHost
+      << " '" << pathToMapper
+      << " " << host
+      << " " << serverPort
+      << " " << cwd
+      << " " << executable
+      << " " << outputPath 
+      << "'";
+  return oss.str();
 }
 
 /**
@@ -616,14 +562,14 @@ string MapReduceServer::buildMapperCommand(const string& remoteHost,
  * invoked command--in this case, a command to run a remote worker--terminates.
  */
 void MapReduceServer::spawnWorker(const string& node, const string& command) throw() {
-	if (verbose)
-		cout << oslock << "Spawning worker on " << node << " with ssh command: " << endl 
-			<< "\t\"" << command << "\"" << endl << osunlock;
-	int status = system(command.c_str());
-	if (status != -1) status = WEXITSTATUS(status);
-	if (verbose) 
-		cout << oslock << "Remote ssh command on " << node << " executed and returned a status " 
-			<< status << "." << endl << osunlock;
+  if (verbose)
+    cout << oslock << "Spawning worker on " << node << " with ssh command: " << endl 
+         << "\t\"" << command << "\"" << endl << osunlock;
+  int status = system(command.c_str());
+  if (status != -1) status = WEXITSTATUS(status);
+  if (verbose) 
+    cout << oslock << "Remote ssh command on " << node << " executed and returned a status " 
+         << status << "." << endl << osunlock;
 }
 
 /**
@@ -632,10 +578,10 @@ void MapReduceServer::spawnWorker(const string& node, const string& command) thr
  * Lists the file hashes of all of the files in specified directory.
  */
 void MapReduceServer::dumpFileHashes(const std::string& dir) throw() {
-	list<string> files;
-	stageFiles(dir, files);
-	files.sort();
-	for (const string& file: files) dumpFileHash(file);
+  list<string> files;
+  stageFiles(dir, files);
+  files.sort();
+  for (const string& file: files) dumpFileHash(file);
 }
 
 /**
@@ -646,8 +592,8 @@ void MapReduceServer::dumpFileHashes(const std::string& dir) throw() {
  */
 
 void MapReduceServer::dumpFileHash(const string& file) throw() {
-	ifstream infile(file);
-	cout << file << " hashes to " << hash<ifstream>()(infile) << endl;
+  ifstream infile(file);
+  cout << file << " hashes to " << hash<ifstream>()(infile) << endl;
 }
 
 /**
@@ -658,10 +604,10 @@ void MapReduceServer::dumpFileHash(const string& file) throw() {
  * that contribute to the MapReduce system.
  */
 MapReduceServer::~MapReduceServer() throw() {
-	// assumption is that thread pool is empty and that server is asleep in an accept call
-	bringDownServer();
-	serverThread.join();
-	if (verbose) cout << "Server has shut down." << endl;
+  // assumption is that thread pool is empty and that server is asleep in an accept call
+  bringDownServer();
+  serverThread.join();
+  if (verbose) cout << "Server has shut down." << endl;
 }
 
 /**
@@ -674,7 +620,7 @@ MapReduceServer::~MapReduceServer() throw() {
  * resources and exits.
  */
 void MapReduceServer::bringDownServer() throw() {
-	// assumption is that thread pool is empty and that server is asleep in an accept call
-	serverIsRunning = false;
-	shutdown(serverSocket, SHUT_RD);
+  // assumption is that thread pool is empty and that server is asleep in an accept call
+  serverIsRunning = false;
+  shutdown(serverSocket, SHUT_RD);
 }

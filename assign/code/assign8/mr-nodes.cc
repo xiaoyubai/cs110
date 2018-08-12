@@ -20,7 +20,7 @@ using namespace std;
 
 static void pollMyth(size_t num, const set<size_t>& exclude, vector<string>& nodes, mutex& m) {
   if (exclude.find(num) != exclude.cend()) return;
-  string command = "timeout 5 ssh -o ConnectTimeout=5 myth" + to_string(num) + " date >& /dev/null";
+  string command = "ssh -o ConnectTimeout=5 myth" + to_string(num) + " date >& /dev/null";
   int ret = system(command.c_str());
   if (ret != 0) return;
   lock_guard<mutex> lg(m);
