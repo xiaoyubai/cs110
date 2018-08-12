@@ -1,5 +1,5 @@
 /**
-1;2c * File: mr-messages.cc
+ * File: mr-messages.cc
  * --------------------
  * Implements the trivial collection of messages that need to be sent from 
  * the server to the mappers and reducers and the equally trivial collection of
