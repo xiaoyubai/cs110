@@ -16,43 +16,23 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
-#include "ostreamlock.h"         // for oslock, osunlock
-#include <iostream>
-#include <string>
 using namespace std;
 
 MapReduceMapper::MapReduceMapper(const string& serverHost, unsigned short serverPort,
-		const string& cwd, const string& executable,
-		const string& outputPath, unsigned short numHashCodes) :
-	MapReduceWorker(serverHost, serverPort, cwd, executable, outputPath) {
-		this->numHashCodes = numHashCodes;
-	}
+                                 const string& cwd, const string& executable,
+                                 const string& outputPath) :
+  MapReduceWorker(serverHost, serverPort, cwd, executable, outputPath) {}
 
 void MapReduceMapper::map() const {
-	while (true) {
-		string name;
-		if (!requestInput(name)) break;
-		alertServerOfProgress("About to process \"" + name + "\".");
-		string base = extractBase(name);
-		string output = outputPath + "/" + changeExtension(base, "input", "mapped");
-		bool success = processInput(name, output);
+  while (true) {
+    string name;
+    if (!requestInput(name)) break;
+    alertServerOfProgress("About to process \"" + name + "\".");
+    string base = extractBase(name);
+    string output = outputPath + "/" + changeExtension(base, "input", "mapped");
+    bool success = processInput(name, output);
+    notifyServer(name, success);
+  }
 
-		string key;
-		int value;
-		ifstream inFile(output);
-		while(inFile >> key >> value) {
-			size_t hashValue = hash<string>()(key) % numHashCodes;
-			string newSuffix = numberToString(hashValue)+ ".mapped";
-			string out = outputPath + "/" + changeExtension(base, "input", newSuffix);
-			ofstream outFile;
-			outFile.open(out, std::ios_base::app);
-			outFile << key << " " << value << endl;
-			outFile.close();
-		}
-		inFile.close();
-		remove(output.c_str()); // remove the intermediate file
-		notifyServer(name, success);
-	}
-
-	alertServerOfProgress("Server says no more input chunks, so shutting down.");
+  alertServerOfProgress("Server says no more input chunks, so shutting down.");
 }

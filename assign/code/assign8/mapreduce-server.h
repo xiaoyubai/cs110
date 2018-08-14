@@ -37,13 +37,9 @@ class MapReduceServer {
   void orchestrateWorkers() throw();
   void handleRequest(int clientSocket, const std::string& clientIPAddress) throw();
   void spawnMappers() throw();
-  void spawnReducers() throw();
   void spawnWorker(const std::string& node, const std::string& command) throw();
 
   std::string buildMapperCommand(const std::string& remoteHost,
-                                 const std::string& executable, 
-                                 const std::string& outputPath) throw();
-  std::string buildReducerCommand(const std::string& remoteHost,
                                  const std::string& executable, 
                                  const std::string& outputPath) throw();
                                   
@@ -79,9 +75,6 @@ class MapReduceServer {
   
   std::list<std::string> unprocessed;
   std::set<std::string> inflight;
-  
-  // newly added
-  std::mutex fileLock;
   
   MapReduceServer(const MapReduceServer& original) = delete;
   MapReduceServer& operator=(const MapReduceServer& rhs) = delete;

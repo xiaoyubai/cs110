@@ -11,40 +11,10 @@
  */
 
 #include "mapreduce-reducer.h"
-#include "ostreamlock.h"         // for oslock, osunlock
-#include "mr-names.h"
-#include <iostream>
 using namespace std;
 
 MapReduceReducer::MapReduceReducer(const string& serverHost, unsigned short serverPort,
-		const string& cwd, const string& executable, const string& inputPath, const string& outputPath) : 
-  MapReduceWorker(serverHost, serverPort, cwd, executable, outputPath) {
-	  this->inputPath = inputPath;
-  }
+                                   const string& cwd, const string& executable, const string& outputPath) : 
+  MapReduceWorker(serverHost, serverPort, cwd, executable, outputPath) {}
 
-void MapReduceReducer::reduce() const {
-	
-	while (true) {
-		string name;
-		if (!requestInput(name)) break;
-		string base = extractBase(name).substr(2);
-
-		string command = "cat " + name;
-		command += " | sort | python " + cwd + "/group-by-key.py > ";
-		command += outputPath + "/" + changeExtension(base, "mapped", "out");
-
-		int status = system(command.c_str());
-		if(status != -1) status = WEXITSTATUS(status);
-
-		alertServerOfProgress("About to process \"" + name + "\".");
-		string before = outputPath + "/" + changeExtension(base, "mapped", "out");
-		string after = outputPath + "/" + changeExtension(base, "mapped", "output");
-
-		bool success = processInput(before, after);
-		remove(before.c_str()); // remove the intermediate file
-
-		notifyServer(name, success);
-	}
-
-	alertServerOfProgress("Server says no more input chunks, so shutting down.");
-}
+void MapReduceReducer::reduce() const {}
